@@ -7,9 +7,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.mibotiquin.data.api.GitHubApi
 import com.mibotiquin.data.local.database.AppDatabase
 import com.mibotiquin.data.repository.ProductRepositoryImpl
 import com.mibotiquin.data.transfer.CabinetTransferManager
+import com.mibotiquin.data.update.UpdateChecker
 import com.mibotiquin.di.PreferencesManager
 import com.mibotiquin.domain.usecase.*
 import com.mibotiquin.notifications.ExpiryCheckWorker
@@ -17,6 +19,10 @@ import com.mibotiquin.notifications.ExpiryNotificationHelper
 import com.mibotiquin.presentation.ui.screen.home.HomeViewModel
 import com.mibotiquin.presentation.ui.screen.scanner.ScannerViewModel
 import java.util.concurrent.TimeUnit
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 
 class MiBotiquinApplication : Application() {
 
@@ -52,6 +58,20 @@ class DiContainer(context: Context) {
     }
     val transferManager by lazy { CabinetTransferManager(context, productRepository) }
 
+    // GitHub API + UpdateChecker
+    private val okHttpClient = OkHttpClient.Builder()
+        .addInterceptor(okhttp3.logging.HttpLoggingInterceptor().apply { level = okhttp3.logging.HttpLoggingInterceptor.Level.BASIC })
+        .build()
+
+    private val retrofit = Retrofit.Builder()
+        .baseUrl("https://api.github.com/")
+        .client(okHttpClient)
+        .addConverterFactory(retrofit2.converter.gson.GsonConverterFactory.create())
+        .build()
+
+    val gitHubApi by lazy { retrofit.create(com.mibotiquin.data.api.GitHubApi::class.java) }
+    val updateChecker by lazy { UpdateChecker(context.cacheDir) }
+
     val viewModelFactory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T = when (modelClass) {
@@ -67,7 +87,9 @@ class DiContainer(context: Context) {
                 addProductUseCase = AddProductUseCase(productRepository),
                 getProductByBarcodeUseCase = GetProductByBarcodeUseCase(productRepository),
                 transferManager = transferManager,
-                preferences = preferences
+                preferences = preferences,
+                updateChecker = updateChecker,
+                context = context
             ) as T
 
             ScannerViewModel::class.java -> ScannerViewModel(preferences) as T

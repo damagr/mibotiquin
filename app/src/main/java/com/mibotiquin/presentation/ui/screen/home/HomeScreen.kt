@@ -1,5 +1,11 @@
 package com.mibotiquin.presentation.ui.screen.home
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,6 +14,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,11 +26,14 @@ import androidx.compose.material.icons.filled.Healing
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,11 +46,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.mibotiquin.BuildConfig
 import com.mibotiquin.R
 import com.mibotiquin.domain.model.Cabinet
 import com.mibotiquin.domain.model.Category
@@ -50,6 +62,7 @@ import com.mibotiquin.presentation.ui.components.CreateCabinetDialog
 import com.mibotiquin.presentation.ui.components.DeleteCabinetDialog
 import com.mibotiquin.presentation.ui.components.ProductCard
 import com.mibotiquin.presentation.ui.components.SearchBar
+import com.mibotiquin.ui.UpdateState
 
 @Composable
 fun HomeScreen(
@@ -65,16 +78,17 @@ fun HomeScreen(
     val showCreateCabinet by viewModel.showCreateCabinet.collectAsStateWithLifecycle()
     val cabinetToDelete by viewModel.cabinetToDelete.collectAsStateWithLifecycle()
     val transferEvent by viewModel.transferEvent.collectAsStateWithLifecycle()
+    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
 
     val focusRequester = remember { FocusRequester() }
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
 
     // Permiso de notificaciones (API 33+) — una sola vez al abrir
-    val notificationPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
     ) { }
     LaunchedEffect(Unit) {
-        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+        if (Build.VERSION.SDK_INT >= 33 &&
             androidx.core.content.ContextCompat.checkSelfPermission(
                 context, android.Manifest.permission.POST_NOTIFICATIONS
             ) != android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -84,13 +98,20 @@ fun HomeScreen(
         focusRequester.requestFocus()
     }
 
-    // SAF: exportar (crear fichero) / importar (abrir fichero)
-    val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
+    // SAF: exportar / importar botiquín
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
     ) { uri -> uri?.let(viewModel::shareCabinet) }
-    val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
     ) { uri -> uri?.let(viewModel::importCabinet) }
+
+    // Selector de carpeta de backups
+    val openDocumentTreeLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        uri?.let { saveBackupFolder(context, it) }
+    }
 
     LaunchedEffect(transferEvent) {
         transferEvent?.let {
@@ -124,6 +145,10 @@ fun HomeScreen(
                 onNewCabinet = { viewModel.onShowCreateCabinet(true) },
                 onDeleteCabinet = {
                     activeCabinet?.let { viewModel.onRequestDeleteCabinet(it) }
+                },
+                onCheckUpdate = { viewModel.checkForUpdate(userInitiated = true) },
+                onChangeBackupFolder = {
+                    openDocumentTreeLauncher.launch(Uri.EMPTY)
                 },
                 cabinetCount = cabinets.size
             )
@@ -168,6 +193,34 @@ fun HomeScreen(
         )
     }
 
+    // ---- Diálogos de actualización ----
+
+    when (val state = updateState) {
+        is UpdateState.Available -> {
+            UpdateAvailableDialog(
+                release = state.release,
+                onUpdate = { viewModel.startUpdate(state.release) },
+                onDismiss = viewModel::dismissUpdateDialog
+            )
+        }
+        is UpdateState.Downloading -> {
+            UpdateDownloadingDialog(progress = state.progress)
+        }
+        is UpdateState.ReadyToInstall -> {
+            UpdateReadyDialog(
+                onInstall = { viewModel.installApk(state.file) },
+                onDismiss = viewModel::dismissUpdateDialog
+            )
+        }
+        is UpdateState.Error -> {
+            UpdateErrorDialog(
+                message = state.message,
+                onDismiss = viewModel::dismissUpdateError
+            )
+        }
+        else -> Unit
+    }
+
     // Código escaneado → sheet (pre-rellenado si ya existía)
     scannedBarcode?.let { barcode ->
         val existing by viewModel.existingForBarcode.collectAsStateWithLifecycle()
@@ -191,6 +244,85 @@ fun HomeScreen(
     }
 }
 
+// ---- Diálogos de actualización ----
+
+@Composable
+private fun UpdateAvailableDialog(
+    release: com.mibotiquin.data.api.GitHubRelease,
+    onUpdate: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Nueva versión disponible") },
+        text = {
+            Column(Modifier.fillMaxWidth()) {
+                Text("Versión ${release.tagName} disponible.")
+                if (!release.body.isNullOrBlank()) {
+                    androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = release.body.take(500),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
+                Text("Se creará un backup de tus datos antes de actualizar. ¿Actualizar ahora?")
+            }
+        },
+        confirmButton = { TextButton(onClick = onUpdate) { Text("Actualizar") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Ahora no") } }
+    )
+}
+
+@Composable
+private fun UpdateDownloadingDialog(progress: Int) {
+    AlertDialog(
+        onDismissRequest = {},
+        title = { Text("Descargando actualización…") },
+        text = {
+            Column(Modifier.fillMaxWidth()) {
+                LinearProgressIndicator(
+                    progress = { progress / 100f },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
+                Text("$progress%")
+            }
+        },
+        confirmButton = {}
+    )
+}
+
+@Composable
+private fun UpdateReadyDialog(
+    onInstall: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Actualización lista") },
+        text = { Text("Se instalará la nueva versión ahora.") },
+        confirmButton = { Button(onClick = onInstall) { Text("Instalar") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
+    )
+}
+
+@Composable
+private fun UpdateErrorDialog(
+    message: String,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Error") },
+        text = { Text(message) },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } }
+    )
+}
+
+// ---- Selectores y menús ----
+
 @Composable
 private fun CabinetSelector(
     cabinets: List<Cabinet>,
@@ -198,10 +330,9 @@ private fun CabinetSelector(
     onSelect: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val version = "v1.0.0"
+    val version = "v${BuildConfig.VERSION_NAME}"
 
     if (cabinets.size <= 1 && activeCabinet != null) {
-        // Un solo botiquín: título + versión
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -223,26 +354,21 @@ private fun CabinetSelector(
 
     Box(modifier = Modifier.padding(start = 4.dp)) {
         TextButton(onClick = { expanded = true }) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = activeCabinet?.name ?: "Botiquín",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = version,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                )
-                Icon(
-                    imageVector = Icons.Filled.ArrowDropDown,
-                    contentDescription = "Cambiar botiquín",
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
+            Text(
+                text = activeCabinet?.name ?: "Botiquín",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = version,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+            )
+            Icon(
+                imageVector = Icons.Filled.ArrowDropDown,
+                contentDescription = "Cambiar botiquín",
+                tint = MaterialTheme.colorScheme.primary
+            )
         }
         DropdownMenu(
             expanded = expanded,
@@ -253,7 +379,6 @@ private fun CabinetSelector(
                     text = {
                         Text(
                             text = cabinet.name,
-                            style = MaterialTheme.typography.titleMedium,
                             color = if (cabinet.id == activeCabinet?.id)
                                 MaterialTheme.colorScheme.primary
                             else
@@ -276,6 +401,8 @@ private fun TransferMenu(
     onImport: () -> Unit,
     onNewCabinet: () -> Unit,
     onDeleteCabinet: () -> Unit,
+    onCheckUpdate: () -> Unit,
+    onChangeBackupFolder: () -> Unit,
     cabinetCount: Int
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -305,6 +432,14 @@ private fun TransferMenu(
                 onClick = { expanded = false; onNewCabinet() }
             )
             DropdownMenuItem(
+                text = { Text("Buscar actualizaciones") },
+                onClick = { expanded = false; onCheckUpdate() }
+            )
+            DropdownMenuItem(
+                text = { Text("Carpeta de backups") },
+                onClick = { expanded = false; onChangeBackupFolder() }
+            )
+            DropdownMenuItem(
                 text = {
                     Text(
                         text = "Eliminar este botiquín",
@@ -317,6 +452,8 @@ private fun TransferMenu(
         }
     }
 }
+
+// ---- Lista ----
 
 @Composable
 private fun ProductList(
@@ -459,4 +596,24 @@ private fun Category.icon() = when (this) {
     Category.MEDICINE -> Icons.Filled.Medication
     Category.FIRST_AID -> Icons.Filled.LocalHospital
     Category.TOPICAL -> Icons.Filled.Healing
+}
+
+// ---- Helpers de carpeta de backups ----
+
+private fun saveBackupFolder(context: Context, uri: Uri) {
+    try {
+        val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        context.contentResolver.takePersistableUriPermission(uri, flags)
+        val prefs = context.getSharedPreferences("mibotiquin_prefs", 0)
+        prefs.edit()
+            .putString("backup_folder_uri", uri.toString())
+            .putString(
+                "backup_folder_display_name",
+                com.mibotiquin.presentation.ui.components.getDisplayName(context.contentResolver, uri)
+            )
+            .apply()
+        android.widget.Toast.makeText(context, "Carpeta de backups actualizada", android.widget.Toast.LENGTH_SHORT).show()
+    } catch (e: Exception) {
+        android.widget.Toast.makeText(context, "Error al guardar carpeta", android.widget.Toast.LENGTH_SHORT).show()
+    }
 }

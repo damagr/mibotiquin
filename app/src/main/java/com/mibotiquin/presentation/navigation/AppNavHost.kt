@@ -9,10 +9,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navDeepLink
+import com.mibotiquin.MiBotiquinApplication
 import com.mibotiquin.presentation.ui.screen.home.HomeScreen
 import com.mibotiquin.presentation.ui.screen.home.HomeViewModel
 import com.mibotiquin.presentation.ui.screen.scanner.ScannerScreen
 import com.mibotiquin.presentation.ui.screen.scanner.ScannerViewModel
+import com.mibotiquin.presentation.ui.screen.setup.SetupScreen
 
 object AppDestinations {
     const val HOME = "home"
@@ -24,7 +26,28 @@ object AppDestinations {
 @Composable
 fun AppNavHost(viewModelFactory: ViewModelProvider.Factory) {
     val navController = rememberNavController()
-    NavHost(navController, startDestination = AppDestinations.HOME) {
+    // Primera instalación → empezar en Setup (elegir carpeta de backups)
+    val startDestination = if (MiBotiquinApplication.container(
+            androidx.compose.ui.platform.LocalContext.current
+        ).preferences.isFirstRun
+    ) "setup" else AppDestinations.HOME
+
+    NavHost(navController, startDestination = startDestination) {
+
+        composable(route = "setup") {
+            val prefs = MiBotiquinApplication.container(
+                androidx.compose.ui.platform.LocalContext.current
+            ).preferences
+            SetupScreen(
+                onComplete = {
+                    prefs.isFirstRun = false
+                    navController.navigate(AppDestinations.HOME) {
+                        popUpTo("setup") { inclusive = true }
+                    }
+                },
+                preferences = prefs
+            )
+        }
 
         composable(route = AppDestinations.HOME) { entry ->
             val homeViewModel: HomeViewModel = viewModel(factory = viewModelFactory)
