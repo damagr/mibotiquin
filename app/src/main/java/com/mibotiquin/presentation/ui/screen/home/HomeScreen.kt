@@ -87,6 +87,7 @@ fun HomeScreen(
     val cabinetToDelete by viewModel.cabinetToDelete.collectAsStateWithLifecycle()
     val transferEvent by viewModel.transferEvent.collectAsStateWithLifecycle()
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+    viewModel.useCameraRefresh.collectAsStateWithLifecycle() // recompose al cambiar cámara
     val useCamera = viewModel.useCamera
 
     val focusRequester = remember { FocusRequester() }
@@ -161,6 +162,8 @@ fun HomeScreen(
                 onChangeBackupFolder = {
                     openDocumentTreeLauncher.launch(Uri.EMPTY)
                 },
+                onToggleCamera = { viewModel.onToggleCamera() },
+                useCamera = useCamera,
                 cabinetCount = cabinets.size
             )
         }
@@ -452,6 +455,8 @@ private fun TransferMenu(
     onDeleteCabinet: () -> Unit,
     onCheckUpdate: () -> Unit,
     onChangeBackupFolder: () -> Unit,
+    onToggleCamera: () -> Unit,
+    useCamera: Boolean,
     cabinetCount: Int
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -483,6 +488,10 @@ private fun TransferMenu(
             DropdownMenuItem(
                 text = { Text("Buscar actualizaciones") },
                 onClick = { expanded = false; onCheckUpdate() }
+            )
+            DropdownMenuItem(
+                text = { Text(if (useCamera) "Cámara: activada" else "Cámara: desactivada") },
+                onClick = { expanded = false; onToggleCamera() }
             )
             DropdownMenuItem(
                 text = { Text("Carpeta de backups") },

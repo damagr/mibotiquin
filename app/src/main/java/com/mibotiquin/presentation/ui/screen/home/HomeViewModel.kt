@@ -49,6 +49,15 @@ class HomeViewModel(
     private val context: Context
 ) : ViewModel() {
 
+    fun onToggleCamera() {
+        preferences.useCamera = !preferences.useCamera
+        // Forzar recomposición de la UI que lee useCamera
+        _useCameraRefresh.value++
+    }
+
+    private val _useCameraRefresh = kotlinx.coroutines.flow.MutableStateFlow(0)
+    val useCameraRefresh: StateFlow<Int> = _useCameraRefresh
+
     val useCamera: Boolean
         get() = preferences.useCamera
 

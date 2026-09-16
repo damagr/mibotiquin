@@ -1,7 +1,5 @@
 package com.mibotiquin.presentation.ui.screen.setup
 
-import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,91 +13,92 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.MedicalInformation
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.mibotiquin.di.PreferencesManager
 
 enum class SetupStep {
-    CHOOSE_FOLDER,
-    CREATE_CABINET
+    CHOOSE_CAMERA,
+    CHOOSE_FOLDER
 }
 
 /**
- * Flujo de primera instalación:
- * 1. Elegir carpeta de backups (SAF)
- * 2. Crear primer botiquín
+ * Configuración inicial (primera instalación):
+ * 1. ¿Usar la cámara para escanear productos?
+ * 2. Carpeta de backups (SAF)
+ * Al terminar, Home pedirá crear el primer botiquín automáticamente.
  */
 @Composable
 fun SetupScreen(
     onComplete: () -> Unit,
-    preferences: com.mibotiquin.di.PreferencesManager
+    preferences: PreferencesManager
 ) {
-    var step by remember { mutableStateOf(SetupStep.CHOOSE_FOLDER) }
-    var showCabinetDialog by remember { mutableStateOf(false) }
-
+    var step by rememberSaveable { mutableStateOf(SetupStep.CHOOSE_CAMERA) }
     val context = LocalContext.current
 
     val treeLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
         uri?.let { selected ->
-            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             try {
+                val flags = android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                 context.contentResolver.takePersistableUriPermission(selected, flags)
                 preferences.backupFolderUri = selected.toString()
                 preferences.backupFolderDisplayName =
                     com.mibotiquin.presentation.ui.components.getDisplayName(
                         context.contentResolver, selected
                     )
-                step = SetupStep.CREATE_CABINET
-                showCabinetDialog = true
             } catch (_: Exception) {
-                // Provider no persistible: avanzamos igualmente
+                // Provider no persistible: guardamos la URI igualmente
                 preferences.backupFolderUri = selected.toString()
-                step = SetupStep.CREATE_CABINET
-                showCabinetDialog = true
             }
+            onComplete()
         }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
         when (step) {
-            SetupStep.CHOOSE_FOLDER -> {
-                ChooseFolderStep(
-                    onPickFolder = {
-                        treeLauncher.launch(Uri.EMPTY)
+            SetupStep.CHOOSE_CAMERA -> {
+                ChooseCameraStep(
+                    onUseCamera = { enabled ->
+                        preferences.useCamera = enabled
+                        step = SetupStep.CHOOSE_FOLDER
                     }
                 )
             }
-            SetupStep.CREATE_CABINET -> {
-                // El Home ya gestiona el diálogo de crear botiquín;
-                // aquí solo completamos el setup
-                LaunchedEffect(Unit) {
-                    onComplete()
-                }
+            SetupStep.CHOOSE_FOLDER -> {
+                ChooseFolderStep(
+                    onPickFolder = {
+                        if (android.os.Build.VERSION.SDK_INT >= 26) {
+                            treeLauncher.launch(Uri.EMPTY)
+                        }
+                    }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun ChooseFolderStep(
-    onPickFolder: () -> Unit
+private fun ChooseCameraStep(
+    onUseCamera: (Boolean) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -122,7 +121,66 @@ private fun ChooseFolderStep(
         )
 
         Text(
-            text = "Antes de empezar, elige dónde se guardarán los backups automáticos que se hacen al actualizar la app.",
+            text = "¿Deseas usar la cámara para escanear los códigos de los productos?",
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(vertical = 16.dp)
+        )
+
+        Text(
+            text = "Podrás cambiar esta opción en los ajustes.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            modifier = Modifier.padding(bottom = 24.dp)
+        )
+
+        Button(
+            onClick = { onUseCamera(true) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+        ) {
+            Text("Sí, usar cámara")
+        }
+
+        OutlinedButton(
+            onClick = { onUseCamera(false) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+        ) {
+            Text("No, introduciré los datos a mano")
+        }
+    }
+}
+
+@Composable
+private fun ChooseFolderStep(
+    onPickFolder: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = Icons.Filled.FolderOpen,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(80.dp)
+        )
+
+        Text(
+            text = "Elige la carpeta de backups",
+            style = MaterialTheme.typography.headlineMedium,
+            textAlign = TextAlign.Center
+        )
+
+        Text(
+            text = "Los backups automáticos al actualizar la app se guardarán aquí.",
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -134,18 +192,14 @@ private fun ChooseFolderStep(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Icon(
-                    imageVector = Icons.Filled.FolderOpen,
+                    imageVector = Icons.Filled.PhotoCamera,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(48.dp)
-                )
-                Text(
-                    text = "Carpeta de backups",
-                    style = MaterialTheme.typography.titleMedium
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                    modifier = Modifier.size(32.dp)
                 )
                 Text(
                     text = "Ej. Documentos/MiBotiquinBackups",
