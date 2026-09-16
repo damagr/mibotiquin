@@ -91,28 +91,46 @@ class HomeViewModel(
     init {
         // Resolver botiquín activo al arrancar
         viewModelScope.launch {
+            var cabinetsLoaded = false
             cabinets.collect { list ->
                 val current = _activeCabinet.value
                 val storedId = preferences.activeCabinetId
                 when {
-                    // Si no hay botiquines, activar el diálogo de creación
-                    list.isEmpty() -> {
-                        _activeCabinet.value = null
-                        _showCreateCabinet.value = true
+                    // Primera emisión: Room aún no ha cargado, no decidir todavía
+                    !cabinetsLoaded -> {
+                        cabinetsLoaded = true
+                        if (list.isEmpty()) {
+                            _activeCabinet.value = null
+                            _showCreateCabinet.value = true
+                        }
+                        // si hay items, el resto del when resuelve el activo
+                        if (list.isNotEmpty()) {
+                            resolveActive(current, storedId, list)
+                        }
                     }
                     current?.id in list.map { it.id } -> Unit // ya activo
-                    storedId != null && list.any { it.id == storedId } ->
-                        _activeCabinet.value = list.first { it.id == storedId }
-                    else -> {
-                        _activeCabinet.value = list.first()
-                        preferences.activeCabinetId = list.first().id
-                    }
+                    else -> resolveActive(current, storedId, list)
                 }
+                // Si hay botiquines, el diálogo de creación nunca debe estar abierto
+                if (list.isNotEmpty()) _showCreateCabinet.value = false
             }
         }
 
         // Comprobar actualizaciones al arrancar (silencioso si está al día)
         checkForUpdate(userInitiated = false)
+    }
+
+    private fun resolveActive(current: Cabinet?, storedId: String?, list: List<Cabinet>) {
+        when {
+            storedId != null && list.any { it.id == storedId } ->
+                _activeCabinet.value = list.first { it.id == storedId }
+            current != null && list.any { it.id == current.id } ->
+                _activeCabinet.value = current
+            else -> {
+                _activeCabinet.value = list.first()
+                preferences.activeCabinetId = list.first().id
+            }
+        }
     }
 
     fun selectCabinet(id: String) {
@@ -328,22 +346,40 @@ class HomeViewModel(
     ) {
         val cabinet = _activeCabinet.value ?: return
         viewModelScope.launch {
-            val existing = _existingForBarcode.value?.product
-            addProductUseCase(
-                Product(
-                    id = existing?.id ?: 0,
-                    barcode = barcode,
-                    name = name,
-                    category = category,
-                    quantity = quantity,
-                    expiryDate = expiryDate,
-                    cabinetId = cabinet.id,
-                    createdAt = existing?.createdAt ?: System.currentTimeMillis(),
-                    updatedAt = System.currentTimeMillis()
+            val existing = _existingForBarcode.value?.product ?: _editingProduct.value?.product
+            try {
+                addProductUseCase(
+                    Product(
+                        id = existing?.id ?: 0, // si existe, REPLACE mantiene el id
+                        barcode = barcode,
+                        name = name,
+                        category = category,
+                        quantity = quantity,
+                        expiryDate = expiryDate,
+                        cabinetId = cabinet.id,
+                        createdAt = existing?.createdAt ?: System.currentTimeMillis(),
+                        updatedAt = System.currentTimeMillis()
+                    )
                 )
-            )
+            } catch (e: Exception) {
+                _transferEvent.value = "Error al guardar el producto"
+            }
             _existingForBarcode.value = null
+            _editingProduct.value = null
         }
+    }
+
+    // ---- Edición de producto (tap en card) ----
+
+    private val _editingProduct = MutableStateFlow<com.mibotiquin.domain.model.ProductUiModel?>(null)
+    val editingProduct: StateFlow<com.mibotiquin.domain.model.ProductUiModel?> = _editingProduct
+
+    fun openEditProduct(product: com.mibotiquin.domain.model.ProductUiModel) {
+        _editingProduct.value = product
+    }
+
+    fun closeEditProduct() {
+        _editingProduct.value = null
     }
 
     // Re-escaneo: producto existente pre-rellena el sheet

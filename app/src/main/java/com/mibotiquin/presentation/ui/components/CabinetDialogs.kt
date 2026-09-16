@@ -2,9 +2,7 @@ package com.mibotiquin.presentation.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -15,10 +13,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.unit.dp
 import com.mibotiquin.domain.model.Cabinet
 
@@ -29,10 +27,11 @@ fun CreateCabinetDialog(
     onCreate: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
+    var name by rememberSaveable { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = { if (!isMandatory) onDismiss() },
+        shape = RectangleShape,
         title = {
             Text(
                 text = if (isMandatory) "Dale nombre a tu botiquín" else "Nuevo botiquín",
@@ -80,11 +79,12 @@ fun DeleteCabinetDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    var typedName by remember { mutableStateOf("") }
+    var typedName by rememberSaveable { mutableStateOf("") }
     val matches = typedName.trim() == cabinet.name
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = RectangleShape,
         title = {
             Text(
                 text = "Eliminar \"${cabinet.name}\"",

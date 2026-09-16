@@ -24,6 +24,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -186,13 +189,16 @@ private fun ScannerControls(
     onTorchToggle: () -> Unit,
     onBack: () -> Unit
 ) {
+    // Insets del status bar: los botones no se solapan con la barra del sistema (notches)
+    val statusBarPadding = androidx.compose.foundation.layout.WindowInsets.statusBars
+        .asPaddingValues()
     Box(modifier = Modifier.fillMaxSize()) {
         // Volver (arriba izquierda)
         IconButton(
             onClick = onBack,
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(16.dp)
+                .padding(top = statusBarPadding.calculateTopPadding() + 8.dp, start = 16.dp)
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -205,7 +211,7 @@ private fun ScannerControls(
             onClick = onTorchToggle,
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(16.dp)
+                .padding(top = statusBarPadding.calculateTopPadding() + 8.dp, end = 16.dp)
         ) {
             Icon(
                 imageVector = if (isTorchOn) Icons.Filled.FlashOn else Icons.Filled.FlashOff,

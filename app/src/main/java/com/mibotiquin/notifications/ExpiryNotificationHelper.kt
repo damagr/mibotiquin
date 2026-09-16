@@ -34,15 +34,15 @@ object ExpiryNotificationHelper {
 
         val title = when (status) {
             ExpiryStatus.SOON -> "${product.product.name} caduca pronto"
-            ExpiryStatus.CRITICAL -> "¡${product.product.name} caduca ${product.formattedDaysUntilExpiry}!"
+            ExpiryStatus.CRITICAL -> "¡${product.product.name} caduca ${product.formattedMonthsUntilExpiry}!"
             ExpiryStatus.EXPIRED -> "${product.product.name} ha caducado"
             else -> return
         }
 
         val content = when (status) {
-            ExpiryStatus.SOON -> "Caduca el ${product.formattedExpiryDate}"
-            ExpiryStatus.CRITICAL -> "Quedan ${product.daysUntilExpiry} días"
-            ExpiryStatus.EXPIRED -> "Caducó ${product.formattedDaysUntilExpiry}. ¿Mantener o eliminar?"
+            ExpiryStatus.SOON -> "Caduca ${product.formattedExpiryMonth} (${product.formattedMonthsUntilExpiry})"
+            ExpiryStatus.CRITICAL -> "Caduca ${product.formattedExpiryMonth}. ¿Mantener o eliminar?"
+            ExpiryStatus.EXPIRED -> "Caducó ${product.formattedExpiryMonth}. ¿Mantener o eliminar?"
             else -> ""
         }
 
@@ -75,7 +75,6 @@ object ExpiryNotificationHelper {
             )
             .setContentIntent(openAppIntent)
             .setAutoCancel(true)
-            // Acción obligatoria en caducados: eliminar de la DB
             .addAction(0, "Eliminar", deleteIntent)
             .addAction(0, "Mantener", openAppIntent)
             .build()

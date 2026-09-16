@@ -12,7 +12,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -25,7 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,11 +42,10 @@ import com.mibotiquin.R
 fun SearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
-    onScannerClick: () -> Unit,
     focusRequester: FocusRequester,
     modifier: Modifier = Modifier
 ) {
-    var text by remember { mutableStateOf(query) }
+    var text by rememberSaveable { mutableStateOf(query) }
 
     LaunchedEffect(query) {
         if (text != query) text = query
@@ -56,7 +54,7 @@ fun SearchBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 4.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center
     ) {
         OutlinedTextField(
@@ -93,14 +91,6 @@ fun SearchBar(
                             imageVector = Icons.Filled.Close,
                             contentDescription = stringResource(R.string.search_clear),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                } else {
-                    IconButton(onClick = onScannerClick) {
-                        Icon(
-                            imageVector = Icons.Filled.QrCodeScanner,
-                            contentDescription = "Escanear código de barras",
-                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 }

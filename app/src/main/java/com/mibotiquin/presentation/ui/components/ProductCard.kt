@@ -2,8 +2,8 @@ package com.mibotiquin.presentation.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,18 +11,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Healing
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.Medication
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,7 +27,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mibotiquin.R
@@ -40,12 +35,14 @@ import com.mibotiquin.domain.model.ExpiryStatus
 import com.mibotiquin.domain.model.ProductUiModel
 import com.mibotiquin.presentation.ui.theme.ExpiryColors
 
+/**
+ * Card de producto: tap para editar (sheet de edición).
+ * Sin stepper ni borrado directo: la edición y el borrado viven dentro del sheet.
+ */
 @Composable
 fun ProductCard(
     product: ProductUiModel,
-    onQuantityChange: (Int) -> Unit,
-    onExpiryDateChange: (Long) -> Unit,
-    onDelete: () -> Unit,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colors = MaterialTheme.colorScheme
@@ -53,7 +50,9 @@ fun ProductCard(
     val hasUrgency = product.expiryStatus != ExpiryStatus.OK
 
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         color = colors.surface,
         tonalElevation = 1.dp,
@@ -69,7 +68,6 @@ fun ProductCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Icono de categoría
             Icon(
                 imageVector = categoryIcon(product.product.category),
                 contentDescription = null,
@@ -77,7 +75,6 @@ fun ProductCard(
                 modifier = Modifier.size(28.dp)
             )
 
-            // Nombre + metadata
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -93,67 +90,21 @@ fun ProductCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    QuantityStepper(
-                        quantity = product.product.quantity,
-                        onChange = onQuantityChange
+                    // Cantidad como badge discreto (la edición vive en el sheet)
+                    Text(
+                        text = "x${product.product.quantity}",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (product.product.quantity > 0) colors.onSurfaceVariant
+                        else colors.error
                     )
                     ExpiryChip(
                         status = product.expiryStatus,
-                        daysText = product.formattedDaysUntilExpiry,
-                        expiryDate = product.formattedExpiryDate,
+                        monthsText = product.formattedMonthsUntilExpiry,
+                        expiryMonth = product.formattedExpiryMonth,
                         colors = expiryColors
                     )
                 }
             }
-
-            IconButton(onClick = onDelete) {
-                Icon(
-                    imageVector = Icons.Filled.DeleteOutline,
-                    contentDescription = "Eliminar",
-                    tint = colors.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun QuantityStepper(
-    quantity: Int,
-    onChange: (Int) -> Unit
-) {
-    val colors = MaterialTheme.colorScheme
-    val enabled = quantity > 0
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
-    ) {
-        IconButton(
-            onClick = { onChange(quantity - 1) },
-            enabled = enabled,
-            modifier = Modifier.size(36.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Remove,
-                contentDescription = "Disminuir cantidad",
-                tint = if (enabled) colors.primary else colors.onSurfaceVariant.copy(alpha = 0.38f)
-            )
-        }
-        Text(
-            text = quantity.toString().padStart(2, '0'),
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-            color = if (enabled) colors.onSurface else colors.onSurfaceVariant.copy(alpha = 0.6f)
-        )
-        IconButton(
-            onClick = { onChange(quantity + 1) },
-            modifier = Modifier.size(36.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Add,
-                contentDescription = "Aumentar cantidad",
-                tint = colors.primary
-            )
         }
     }
 }
@@ -161,15 +112,15 @@ private fun QuantityStepper(
 @Composable
 private fun ExpiryChip(
     status: ExpiryStatus,
-    daysText: String,
-    expiryDate: String,
+    monthsText: String,
+    expiryMonth: String,
     colors: com.mibotiquin.presentation.ui.theme.ExpiryColorSet
 ) {
     val themeColors = MaterialTheme.colorScheme
 
     if (status == ExpiryStatus.OK) {
         Text(
-            text = "Caduca $expiryDate",
+            text = "Caduca $expiryMonth",
             style = MaterialTheme.typography.bodyMedium,
             color = themeColors.onSurfaceVariant
         )
@@ -196,8 +147,8 @@ private fun ExpiryChip(
             )
             Text(
                 text = when (status) {
-                    ExpiryStatus.SOON, ExpiryStatus.CRITICAL -> daysText
-                    ExpiryStatus.EXPIRED -> stringResource(R.string.product_expired)
+                    ExpiryStatus.SOON, ExpiryStatus.CRITICAL -> monthsText
+                    ExpiryStatus.EXPIRED -> "Caducado ${monthsText.replace("desde ", "")}"
                     ExpiryStatus.EMPTY -> stringResource(R.string.product_empty)
                     else -> ""
                 },

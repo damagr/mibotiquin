@@ -12,11 +12,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +29,7 @@ import androidx.compose.material.icons.filled.Healing
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -42,6 +46,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -124,16 +129,18 @@ fun HomeScreen(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
-        // Search Bar + menú de acciones
+        // Header: nombre del botiquín + versión + menú (con insets del status bar para notches)
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            SearchBar(
-                query = query,
-                onQueryChange = viewModel::onSearchQueryChange,
-                onScannerClick = onOpenScanner,
-                focusRequester = focusRequester,
+            CabinetHeader(
+                cabinets = cabinets,
+                activeCabinet = activeCabinet,
+                onSelect = viewModel::selectCabinet,
                 modifier = Modifier.weight(1f)
             )
             TransferMenu(
@@ -154,20 +161,33 @@ fun HomeScreen(
             )
         }
 
-        // Selector de botiquín (discreto, sobre la lista)
-        CabinetSelector(
-            cabinets = cabinets,
-            activeCabinet = activeCabinet,
-            onSelect = viewModel::selectCabinet
-        )
+        // Search bar + botón de escaneo (fuera del searchbar: buscar ≠ introducir)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SearchBar(
+                query = query,
+                onQueryChange = viewModel::onSearchQueryChange,
+                focusRequester = focusRequester,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = onOpenScanner, modifier = Modifier.size(48.dp)) {
+                Icon(
+                    imageVector = Icons.Filled.PhotoCamera,
+                    contentDescription = "Escanear producto",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
 
         ProductList(
             products = products,
             query = query,
             onAddProduct = onOpenScanner,
-            onQuantityChange = viewModel::onQuantityChange,
-            onExpiryDateChange = viewModel::onExpiryDateChange,
-            onDeleteProduct = viewModel::onDeleteProduct,
+            onProductClick = viewModel::openEditProduct,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
@@ -190,6 +210,23 @@ fun HomeScreen(
             cabinet = cabinet,
             onConfirm = { viewModel.deleteCabinet(cabinet.id) },
             onDismiss = viewModel::onDismissDeleteCabinet
+        )
+    }
+
+    // Edición de producto (tap en card) → diálogo pre-rellenado con borrado confirmado
+    val editingProduct by viewModel.editingProduct.collectAsStateWithLifecycle()
+    editingProduct?.let { product ->
+        AddProductSheet(
+            barcode = product.product.barcode,
+            existing = product,
+            onSave = { code, name, category, quantity, expiry ->
+                viewModel.addProduct(code, name, category, quantity, expiry)
+            },
+            onDelete = {
+                viewModel.onDeleteProduct(product)
+                viewModel.closeEditProduct()
+            },
+            onDismiss = viewModel::closeEditProduct
         )
     }
 
@@ -324,17 +361,18 @@ private fun UpdateErrorDialog(
 // ---- Selectores y menús ----
 
 @Composable
-private fun CabinetSelector(
+private fun CabinetHeader(
     cabinets: List<Cabinet>,
     activeCabinet: Cabinet?,
-    onSelect: (String) -> Unit
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    var expanded by rememberSaveable { mutableStateOf(false) }
     val version = "v${BuildConfig.VERSION_NAME}"
 
     if (cabinets.size <= 1 && activeCabinet != null) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            modifier = modifier,
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -352,7 +390,7 @@ private fun CabinetSelector(
         return
     }
 
-    Box(modifier = Modifier.padding(start = 4.dp)) {
+    Box(modifier = modifier) {
         TextButton(onClick = { expanded = true }) {
             Text(
                 text = activeCabinet?.name ?: "Botiquín",
@@ -460,9 +498,7 @@ private fun ProductList(
     products: List<ProductUiModel>,
     query: String,
     onAddProduct: () -> Unit,
-    onQuantityChange: (ProductUiModel, Int) -> Unit,
-    onExpiryDateChange: (ProductUiModel, Long) -> Unit,
-    onDeleteProduct: (ProductUiModel) -> Unit,
+    onProductClick: (ProductUiModel) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (products.isEmpty()) {
@@ -483,9 +519,7 @@ private fun ProductList(
             CategorySection(
                 category = category,
                 products = categoryProducts,
-                onQuantityChange = onQuantityChange,
-                onExpiryDateChange = onExpiryDateChange,
-                onDeleteProduct = onDeleteProduct
+                onProductClick = onProductClick
             )
         }
     }
@@ -495,9 +529,7 @@ private fun ProductList(
 private fun CategorySection(
     category: Category,
     products: List<ProductUiModel>,
-    onQuantityChange: (ProductUiModel, Int) -> Unit,
-    onExpiryDateChange: (ProductUiModel, Long) -> Unit,
-    onDeleteProduct: (ProductUiModel) -> Unit
+    onProductClick: (ProductUiModel) -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -538,9 +570,7 @@ private fun CategorySection(
             products.forEach { product ->
                 ProductCard(
                     product = product,
-                    onQuantityChange = { onQuantityChange(product, it) },
-                    onExpiryDateChange = { onExpiryDateChange(product, it) },
-                    onDelete = { onDeleteProduct(product) }
+                    onClick = { onProductClick(product) }
                 )
             }
         }
