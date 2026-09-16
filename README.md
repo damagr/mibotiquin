@@ -58,21 +58,6 @@ git clone https://github.com/damagr/mibotiquin.git
 adb install mibotiquin-release.apk
 ```
 
-## 🔐 Firma & Release
-
-- Keystore: `release.jks` (RSA 4096, 10k días, alias `mibotiquin`)
-- Configurado en `signingConfigs.release` → lee `keystore.properties` (gitignored)
-- Workflow: `.github/workflows/release.yml` (auto-tag al subir versión en `app/build.gradle.kts`)
-
-### Secrets requeridos en GitHub
-
-| Secret | Descripción |
-|--------|-------------|
-| `KEYSTORE_BASE64` | `base64 -w 0 release.jks` |
-| `KEYSTORE_PASS` | Password del almacén |
-| `KEY_ALIAS` | `mibotiquin` |
-| `KEY_PASS` | Password de la clave (igual que store en PKCS12) |
-
 ## 📦 Release
 
 ```bash
