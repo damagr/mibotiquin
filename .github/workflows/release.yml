@@ -65,6 +65,10 @@ jobs:
           echo 'keyAlias=${{ secrets.KEY_ALIAS }}' >> keystore.properties
           echo 'keyPassword=${{ secrets.KEY_PASS }}' >> keystore.properties
 
+      - name: Generate Gradle wrapper
+        if: steps.version.outputs.skip == 'false'
+        run: gradle wrapper --gradle-version 9.3.1 --distribution-type all
+
       - name: Build release APK
         if: steps.version.outputs.skip == 'false'
         run: |
