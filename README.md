@@ -17,13 +17,9 @@
 | **Backup local** | Exporta/importa todo el inventario vía SAF (JSON) |
 | **Cero onboarding** | Abres la app y ya estás viendo tu botiquín; si está vacío, pide nombre del primero |
 
-## 📱 Capturas
+## 📱 Flujo
 
-<!-- Añade screenshots aquí -->
-
-| Home | Scanner | Sheet | Alertas |
-|------|---------|-------|---------|
-| ![home](docs/home.png) | ![scan](docs/scan.png) | ![sheet](docs/sheet.png) | ![notify](docs/notify.png) |
+Abres la app → búsqueda activa → escaneas → añades → listo. Cero onboarding.
 
 ## 🏗️ Arquitectura
 
