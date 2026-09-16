@@ -198,30 +198,51 @@ private fun CabinetSelector(
     onSelect: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val version = "v1.0.0"
 
     if (cabinets.size <= 1 && activeCabinet != null) {
-        // Un solo botiquín: solo título, sin menú
-        Text(
-            text = activeCabinet.name,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-        )
+        // Un solo botiquín: título + versión
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = activeCabinet.name,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = version,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            )
+        }
         return
     }
 
     Box(modifier = Modifier.padding(start = 4.dp)) {
         TextButton(onClick = { expanded = true }) {
-            Text(
-                text = activeCabinet?.name ?: "Botiquín",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Icon(
-                imageVector = Icons.Filled.ArrowDropDown,
-                contentDescription = "Cambiar botiquín",
-                tint = MaterialTheme.colorScheme.primary
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = activeCabinet?.name ?: "Botiquín",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = version,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                )
+                Icon(
+                    imageVector = Icons.Filled.ArrowDropDown,
+                    contentDescription = "Cambiar botiquín",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
         }
         DropdownMenu(
             expanded = expanded,
