@@ -46,18 +46,27 @@ import java.time.ZoneId
 fun AddProductSheet(
     barcode: String,
     existing: ProductUiModel? = null,
+    prefillName: String? = null,            // nombre consultado de CIMA
+    prefillExpiryYearMonth: String? = null, // "yyyy-MM" del parser GS1 (DataMatrix)
     onSave: (barcode: String, name: String, category: Category, quantity: Int, expiryDate: Long) -> Unit,
     onDelete: (() -> Unit)? = null,   // solo en edición
     onDismiss: () -> Unit
 ) {
     // rememberSaveable: sobrevive rotación y cierre inesperado
-    var name by rememberSaveable { mutableStateOf(existing?.product?.name ?: "") }
-    var category by rememberSaveable { mutableStateOf(existing?.product?.category ?: Category.MEDICINE) }
+    // Prioridad: producto existente (edición) > prefills (CIMA/DataMatrix) > defaults
+    var name by rememberSaveable {
+        mutableStateOf(existing?.product?.name ?: prefillName ?: "")
+    }
+    var category by rememberSaveable {
+        mutableStateOf(existing?.product?.category ?: Category.MEDICINE)
+    }
     var quantity by rememberSaveable { mutableIntStateOf(existing?.product?.quantity ?: 1) }
 
-    // Caducidad: mes/año. Default: mismo mes del año siguiente
-    val defaultExpiryMonth = remember(existing) {
-        existing?.product?.expiryMonth ?: YearMonth.now(ZoneId.systemDefault()).plusYears(1)
+    // Caducidad: mes/año. Prioridad: existente > DataMatrix > mismo mes del año siguiente
+    val defaultExpiryMonth = remember(existing, prefillExpiryYearMonth) {
+        existing?.product?.expiryMonth
+            ?: prefillExpiryYearMonth?.let { runCatching { YearMonth.parse(it) }.getOrNull() }
+            ?: YearMonth.now(ZoneId.systemDefault()).plusYears(1)
     }
     var expiryMonth by rememberSaveable { mutableStateOf(defaultExpiryMonth.toString()) }
     var showMonthPicker by rememberSaveable { mutableStateOf(false) }

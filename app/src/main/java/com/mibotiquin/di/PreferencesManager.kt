@@ -15,6 +15,13 @@ class PreferencesManager(context: Context) {
             prefs.edit().putString(KEY_ACTIVE_CABINET, value).apply()
         }
 
+    /** Uso de cámara para escanear (configurable en setup y ajustes) */
+    var useCamera: Boolean
+        get() = prefs.getBoolean(KEY_USE_CAMERA, true)
+        set(value) {
+            prefs.edit().putBoolean(KEY_USE_CAMERA, value).apply()
+        }
+
     var isFirstRun: Boolean
         get() = prefs.getBoolean(KEY_FIRST_RUN, true)
         set(value) {
@@ -62,5 +69,6 @@ class PreferencesManager(context: Context) {
         private const val KEY_FIRST_RUN = "is_first_run"
         private const val KEY_BACKUP_FOLDER_URI = "backup_folder_uri"
         private const val KEY_BACKUP_FOLDER_NAME = "backup_folder_display_name"
+        private const val KEY_USE_CAMERA = "use_camera"
     }
 }

@@ -20,46 +20,54 @@ object AppDestinations {
     const val HOME = "home"
     const val SCANNER = "scanner"
     const val DEEP_LINK_SCAN_URI = "mibotiquin://scan"
-    const val KEY_SCANNED_BARCODE = "scanned_barcode"
+    const val KEY_SCANNED_CN = "scanned_cn"
+    const val KEY_SCANNED_NAME = "scanned_name"
+    const val KEY_SCANNED_EXPIRY = "scanned_expiry"
 }
 
 @Composable
 fun AppNavHost(viewModelFactory: ViewModelProvider.Factory) {
     val navController = rememberNavController()
-    // Primera instalación → empezar en Setup (elegir carpeta de backups)
-    val startDestination = if (MiBotiquinApplication.container(
-            androidx.compose.ui.platform.LocalContext.current
-        ).preferences.isFirstRun
-    ) "setup" else AppDestinations.HOME
+    val container = MiBotiquinApplication.container(
+        androidx.compose.ui.platform.LocalContext.current
+    )
+    val startDestination = if (container.preferences.isFirstRun) "setup" else AppDestinations.HOME
 
     NavHost(navController, startDestination = startDestination) {
 
         composable(route = "setup") {
-            val prefs = MiBotiquinApplication.container(
-                androidx.compose.ui.platform.LocalContext.current
-            ).preferences
             SetupScreen(
                 onComplete = {
-                    prefs.isFirstRun = false
+                    container.preferences.isFirstRun = false
                     navController.navigate(AppDestinations.HOME) {
                         popUpTo("setup") { inclusive = true }
                     }
                 },
-                preferences = prefs
+                preferences = container.preferences
             )
         }
 
         composable(route = AppDestinations.HOME) { entry ->
             val homeViewModel: HomeViewModel = viewModel(factory = viewModelFactory)
-            val scannedBarcode by entry.savedStateHandle
-                .getStateFlow<String?>(AppDestinations.KEY_SCANNED_BARCODE, null)
+            val scannedCn by entry.savedStateHandle
+                .getStateFlow<String?>(AppDestinations.KEY_SCANNED_CN, null)
+                .collectAsStateWithLifecycle()
+            val scannedName by entry.savedStateHandle
+                .getStateFlow<String?>(AppDestinations.KEY_SCANNED_NAME, null)
+                .collectAsStateWithLifecycle()
+            val scannedExpiry by entry.savedStateHandle
+                .getStateFlow<String?>(AppDestinations.KEY_SCANNED_EXPIRY, null)
                 .collectAsStateWithLifecycle()
 
             HomeScreen(
                 onOpenScanner = { navController.navigate(AppDestinations.SCANNER) },
-                scannedBarcode = scannedBarcode,
-                onBarcodeConsumed = {
-                    entry.savedStateHandle.remove<String>(AppDestinations.KEY_SCANNED_BARCODE)
+                scannedCn = scannedCn,
+                scannedName = scannedName,
+                scannedExpiry = scannedExpiry,
+                onScanConsumed = {
+                    entry.savedStateHandle.remove<String>(AppDestinations.KEY_SCANNED_CN)
+                    entry.savedStateHandle.remove<String>(AppDestinations.KEY_SCANNED_NAME)
+                    entry.savedStateHandle.remove<String>(AppDestinations.KEY_SCANNED_EXPIRY)
                 },
                 viewModel = homeViewModel
             )
@@ -71,10 +79,16 @@ fun AppNavHost(viewModelFactory: ViewModelProvider.Factory) {
         ) {
             val scannerViewModel: ScannerViewModel = viewModel(factory = viewModelFactory)
             ScannerScreen(
-                onScanComplete = { barcode ->
-                    navController.previousBackStackEntry
-                        ?.savedStateHandle
-                        ?.set(AppDestinations.KEY_SCANNED_BARCODE, barcode)
+                onScanComplete = { cn, name, expiry ->
+                    navController.previousBackStackEntry?.savedStateHandle?.set(
+                        AppDestinations.KEY_SCANNED_CN, cn
+                    )
+                    navController.previousBackStackEntry?.savedStateHandle?.set(
+                        AppDestinations.KEY_SCANNED_NAME, name
+                    )
+                    navController.previousBackStackEntry?.savedStateHandle?.set(
+                        AppDestinations.KEY_SCANNED_EXPIRY, expiry
+                    )
                     navController.popBackStack()
                 },
                 onBack = { navController.popBackStack() },

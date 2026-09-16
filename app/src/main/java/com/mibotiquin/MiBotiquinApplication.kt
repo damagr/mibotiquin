@@ -72,6 +72,15 @@ class DiContainer(context: Context) {
     val gitHubApi by lazy { retrofit.create(com.mibotiquin.data.api.GitHubApi::class.java) }
     val updateChecker by lazy { UpdateChecker(context.cacheDir) }
 
+    // CIMA API (AEMPS) — medicamentos españoles
+    private val cimaRetrofit = Retrofit.Builder()
+        .baseUrl("https://cima.aemps.es/")
+        .client(okHttpClient)
+        .addConverterFactory(retrofit2.converter.gson.GsonConverterFactory.create())
+        .build()
+
+    val cimaApi by lazy { cimaRetrofit.create(com.mibotiquin.data.api.CimaApi::class.java) }
+
     val viewModelFactory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T = when (modelClass) {
@@ -92,7 +101,7 @@ class DiContainer(context: Context) {
                 context = context
             ) as T
 
-            ScannerViewModel::class.java -> ScannerViewModel(preferences) as T
+            ScannerViewModel::class.java -> ScannerViewModel(cimaApi, preferences) as T
 
             else -> throw IllegalArgumentException("ViewModel desconocido: ${modelClass.name}")
         }

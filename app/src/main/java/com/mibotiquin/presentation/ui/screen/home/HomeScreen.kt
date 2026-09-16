@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Healing
 import androidx.compose.material.icons.filled.LocalHospital
@@ -72,8 +73,10 @@ import com.mibotiquin.ui.UpdateState
 @Composable
 fun HomeScreen(
     onOpenScanner: () -> Unit,
-    scannedBarcode: String? = null,
-    onBarcodeConsumed: () -> Unit = {},
+    scannedCn: String? = null,
+    scannedName: String? = null,
+    scannedExpiry: String? = null,
+    onScanConsumed: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
     val query by viewModel.searchQuery.collectAsStateWithLifecycle()
@@ -84,6 +87,7 @@ fun HomeScreen(
     val cabinetToDelete by viewModel.cabinetToDelete.collectAsStateWithLifecycle()
     val transferEvent by viewModel.transferEvent.collectAsStateWithLifecycle()
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+    val useCamera = viewModel.useCamera
 
     val focusRequester = remember { FocusRequester() }
     val context = LocalContext.current
@@ -176,8 +180,8 @@ fun HomeScreen(
             )
             IconButton(onClick = onOpenScanner, modifier = Modifier.size(48.dp)) {
                 Icon(
-                    imageVector = Icons.Filled.PhotoCamera,
-                    contentDescription = "Escanear producto",
+                    imageVector = if (useCamera) Icons.Filled.PhotoCamera else Icons.Filled.Add,
+                    contentDescription = if (useCamera) "Escanear producto" else "Añadir producto",
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
@@ -258,26 +262,33 @@ fun HomeScreen(
         else -> Unit
     }
 
-    // Código escaneado → sheet (pre-rellenado si ya existía)
-    scannedBarcode?.let { barcode ->
+    // CN escaneado → buscar en la DB local: si existe, editar; si no, sheet con prefills de CIMA/DataMatrix
+    scannedCn?.let { barcode ->
         val existing by viewModel.existingForBarcode.collectAsStateWithLifecycle()
+        var lookupDone by remember(barcode) { mutableStateOf(false) }
 
         LaunchedEffect(barcode) {
             viewModel.lookupBarcode(barcode)
+            lookupDone = true
         }
 
-        AddProductSheet(
-            barcode = barcode,
-            existing = existing,
-            onSave = { code, name, category, quantity, expiry ->
-                viewModel.addProduct(code, name, category, quantity, expiry)
-                onBarcodeConsumed()
-            },
-            onDismiss = {
-                viewModel.clearLookup()
-                onBarcodeConsumed()
-            }
-        )
+        if (lookupDone) {
+            val isNewProduct = existing == null
+            AddProductSheet(
+                barcode = barcode,
+                existing = existing,
+                prefillName = if (isNewProduct) scannedName else null,
+                prefillExpiryYearMonth = if (isNewProduct) scannedExpiry else null,
+                onSave = { code, name, category, quantity, expiry ->
+                    viewModel.addProduct(code, name, category, quantity, expiry)
+                    onScanConsumed()
+                },
+                onDismiss = {
+                    viewModel.clearLookup()
+                    onScanConsumed()
+                }
+            )
+        }
     }
 }
 

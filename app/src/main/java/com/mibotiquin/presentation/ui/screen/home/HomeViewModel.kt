@@ -49,6 +49,9 @@ class HomeViewModel(
     private val context: Context
 ) : ViewModel() {
 
+    val useCamera: Boolean
+        get() = preferences.useCamera
+
     // ---- Botiquines ----
 
     val cabinets: StateFlow<List<Cabinet>> = getCabinetsUseCase()
