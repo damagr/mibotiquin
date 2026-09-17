@@ -7,6 +7,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,14 +32,13 @@ import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -52,6 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -68,11 +69,16 @@ import com.mibotiquin.presentation.ui.components.CreateCabinetDialog
 import com.mibotiquin.presentation.ui.components.DeleteCabinetDialog
 import com.mibotiquin.presentation.ui.components.ProductCard
 import com.mibotiquin.presentation.ui.components.SearchBar
+import com.mibotiquin.presentation.ui.components.UpdateAvailableDialog
+import com.mibotiquin.presentation.ui.components.UpdateDownloadingDialog
+import com.mibotiquin.presentation.ui.components.UpdateErrorDialog
+import com.mibotiquin.presentation.ui.components.UpdateReadyDialog
 import com.mibotiquin.ui.UpdateState
 
 @Composable
 fun HomeScreen(
     onOpenScanner: () -> Unit,
+    onOpenSettings: () -> Unit,
     scannedCn: String? = null,
     scannedName: String? = null,
     scannedExpiry: String? = null,
@@ -87,13 +93,14 @@ fun HomeScreen(
     val cabinetToDelete by viewModel.cabinetToDelete.collectAsStateWithLifecycle()
     val transferEvent by viewModel.transferEvent.collectAsStateWithLifecycle()
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
-    viewModel.useCameraRefresh.collectAsStateWithLifecycle() // recompose al cambiar cámara
-    val useCamera = viewModel.useCamera
+    val useCamera by viewModel.useCamera.collectAsStateWithLifecycle()
+    val showProductSheet by viewModel.showProductSheet.collectAsStateWithLifecycle()
+    val editingProduct by viewModel.editingProduct.collectAsStateWithLifecycle()
 
     val focusRequester = remember { FocusRequester() }
     val context = LocalContext.current
 
-    // Permiso de notificaciones (API 33+) — una sola vez al abrir
+    // Permiso de notificaciones (API 33+) — launcher FUERA de corrutinas
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { }
@@ -105,7 +112,7 @@ fun HomeScreen(
         ) {
             notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
-        focusRequester.requestFocus()
+        // Sin autofoco: el teclado no se abre solo al entrar
     }
 
     // SAF: exportar / importar botiquín
@@ -130,11 +137,9 @@ fun HomeScreen(
         }
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(0.dp)
-    ) {
-        // Header: nombre del botiquín + versión + menú (con insets del status bar para notches)
+    Column(modifier = Modifier.fillMaxSize()) {
+
+        // Header: nombre botiquín + versión + ajustes (insets status bar para notches)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -148,24 +153,13 @@ fun HomeScreen(
                 onSelect = viewModel::selectCabinet,
                 modifier = Modifier.weight(1f)
             )
-            TransferMenu(
-                onExport = {
-                    val name = activeCabinet?.name ?: "botiquin"
-                    exportLauncher.launch("botiquin_${name.replace(" ", "_")}.json")
-                },
-                onImport = { importLauncher.launch(arrayOf("application/json")) },
-                onNewCabinet = { viewModel.onShowCreateCabinet(true) },
-                onDeleteCabinet = {
-                    activeCabinet?.let { viewModel.onRequestDeleteCabinet(it) }
-                },
-                onCheckUpdate = { viewModel.checkForUpdate(userInitiated = true) },
-                onChangeBackupFolder = {
-                    openDocumentTreeLauncher.launch(Uri.EMPTY)
-                },
-                onToggleCamera = { viewModel.onToggleCamera() },
-                useCamera = useCamera,
-                cabinetCount = cabinets.size
-            )
+            IconButton(onClick = onOpenSettings) {
+                Icon(
+                    imageVector = Icons.Filled.Settings,
+                    contentDescription = "Ajustes",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
         }
 
         // Search bar + botón de escaneo (fuera del searchbar: buscar ≠ introducir)
@@ -221,20 +215,48 @@ fun HomeScreen(
     }
 
     // Edición de producto (tap en card) → diálogo pre-rellenado con borrado confirmado
-    val editingProduct by viewModel.editingProduct.collectAsStateWithLifecycle()
-    editingProduct?.let { product ->
-        AddProductSheet(
-            barcode = product.product.barcode,
-            existing = product,
-            onSave = { code, name, category, quantity, expiry ->
-                viewModel.addProduct(code, name, category, quantity, expiry)
-            },
-            onDelete = {
-                viewModel.onDeleteProduct(product)
-                viewModel.closeEditProduct()
-            },
-            onDismiss = viewModel::closeEditProduct
-        )
+    if (showProductSheet) {
+        editingProduct?.let { product ->
+            AddProductSheet(
+                barcode = product.product.barcode,
+                existing = product,
+                onSave = { code, name, category, quantity, expiry ->
+                    viewModel.addProduct(code, name, category, quantity, expiry)
+                },
+                onDelete = {
+                    viewModel.onDeleteProduct(product)
+                    viewModel.closeProductSheet()
+                },
+                onDismiss = viewModel::closeProductSheet
+            )
+        }
+    }
+
+    // CN escaneado → buscar en la DB local: si existe, editar; si no, sheet con prefills
+    scannedCn?.let { barcode ->
+        val existing by viewModel.existingForBarcode.collectAsStateWithLifecycle()
+
+        LaunchedEffect(barcode) {
+            viewModel.lookupBarcode(barcode)
+        }
+
+        if (showProductSheet) {
+            val isNewProduct = existing == null
+            AddProductSheet(
+                barcode = barcode,
+                existing = if (isNewProduct) null else existing,
+                prefillName = if (isNewProduct) scannedName else null,
+                prefillExpiryYearMonth = if (isNewProduct) scannedExpiry else null,
+                onSave = { code, name, category, quantity, expiry ->
+                    viewModel.addProduct(code, name, category, quantity, expiry)
+                    onScanConsumed()
+                },
+                onDismiss = {
+                    viewModel.closeProductSheet()
+                    onScanConsumed()
+                }
+            )
+        }
     }
 
     // ---- Diálogos de actualización ----
@@ -264,115 +286,9 @@ fun HomeScreen(
         }
         else -> Unit
     }
-
-    // CN escaneado → buscar en la DB local: si existe, editar; si no, sheet con prefills de CIMA/DataMatrix
-    scannedCn?.let { barcode ->
-        val existing by viewModel.existingForBarcode.collectAsStateWithLifecycle()
-        var lookupDone by remember(barcode) { mutableStateOf(false) }
-
-        LaunchedEffect(barcode) {
-            viewModel.lookupBarcode(barcode)
-            lookupDone = true
-        }
-
-        if (lookupDone) {
-            val isNewProduct = existing == null
-            AddProductSheet(
-                barcode = barcode,
-                existing = existing,
-                prefillName = if (isNewProduct) scannedName else null,
-                prefillExpiryYearMonth = if (isNewProduct) scannedExpiry else null,
-                onSave = { code, name, category, quantity, expiry ->
-                    viewModel.addProduct(code, name, category, quantity, expiry)
-                    onScanConsumed()
-                },
-                onDismiss = {
-                    viewModel.clearLookup()
-                    onScanConsumed()
-                }
-            )
-        }
-    }
 }
 
-// ---- Diálogos de actualización ----
-
-@Composable
-private fun UpdateAvailableDialog(
-    release: com.mibotiquin.data.api.GitHubRelease,
-    onUpdate: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Nueva versión disponible") },
-        text = {
-            Column(Modifier.fillMaxWidth()) {
-                Text("Versión ${release.tagName} disponible.")
-                if (!release.body.isNullOrBlank()) {
-                    androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = release.body.take(500),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
-                Text("Se creará un backup de tus datos antes de actualizar. ¿Actualizar ahora?")
-            }
-        },
-        confirmButton = { TextButton(onClick = onUpdate) { Text("Actualizar") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Ahora no") } }
-    )
-}
-
-@Composable
-private fun UpdateDownloadingDialog(progress: Int) {
-    AlertDialog(
-        onDismissRequest = {},
-        title = { Text("Descargando actualización…") },
-        text = {
-            Column(Modifier.fillMaxWidth()) {
-                LinearProgressIndicator(
-                    progress = { progress / 100f },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
-                Text("$progress%")
-            }
-        },
-        confirmButton = {}
-    )
-}
-
-@Composable
-private fun UpdateReadyDialog(
-    onInstall: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Actualización lista") },
-        text = { Text("Se instalará la nueva versión ahora.") },
-        confirmButton = { Button(onClick = onInstall) { Text("Instalar") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
-    )
-}
-
-@Composable
-private fun UpdateErrorDialog(
-    message: String,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Error") },
-        text = { Text(message) },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } }
-    )
-}
-
-// ---- Selectores y menús ----
+// ---- Componentes internos ----
 
 @Composable
 private fun CabinetHeader(
@@ -446,72 +362,6 @@ private fun CabinetHeader(
         }
     }
 }
-
-@Composable
-private fun TransferMenu(
-    onExport: () -> Unit,
-    onImport: () -> Unit,
-    onNewCabinet: () -> Unit,
-    onDeleteCabinet: () -> Unit,
-    onCheckUpdate: () -> Unit,
-    onChangeBackupFolder: () -> Unit,
-    onToggleCamera: () -> Unit,
-    useCamera: Boolean,
-    cabinetCount: Int
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Box {
-        IconButton(onClick = { expanded = true }) {
-            Icon(
-                imageVector = Icons.Filled.MoreVert,
-                contentDescription = "Opciones de botiquín",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            DropdownMenuItem(
-                text = { Text("Compartir este botiquín") },
-                onClick = { expanded = false; onExport() }
-            )
-            DropdownMenuItem(
-                text = { Text("Importar botiquín") },
-                onClick = { expanded = false; onImport() }
-            )
-            DropdownMenuItem(
-                text = { Text("Nuevo botiquín") },
-                onClick = { expanded = false; onNewCabinet() }
-            )
-            DropdownMenuItem(
-                text = { Text("Buscar actualizaciones") },
-                onClick = { expanded = false; onCheckUpdate() }
-            )
-            DropdownMenuItem(
-                text = { Text(if (useCamera) "Cámara: activada" else "Cámara: desactivada") },
-                onClick = { expanded = false; onToggleCamera() }
-            )
-            DropdownMenuItem(
-                text = { Text("Carpeta de backups") },
-                onClick = { expanded = false; onChangeBackupFolder() }
-            )
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        text = "Eliminar este botiquín",
-                        color = MaterialTheme.colorScheme.error
-                    )
-                },
-                onClick = { expanded = false; onDeleteCabinet() },
-                enabled = cabinetCount > 1
-            )
-        }
-    }
-}
-
-// ---- Lista ----
 
 @Composable
 private fun ProductList(
@@ -648,13 +498,13 @@ private fun Category.icon() = when (this) {
     Category.TOPICAL -> Icons.Filled.Healing
 }
 
-// ---- Helpers de carpeta de backups ----
+// ---- Helpers ----
 
 private fun saveBackupFolder(context: Context, uri: Uri) {
     try {
         val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
         context.contentResolver.takePersistableUriPermission(uri, flags)
-        val prefs = context.getSharedPreferences("mibotiquin_prefs", 0)
+        val prefs = context.getSharedPreferences("mibotiquin_prefs", Context.MODE_PRIVATE)
         prefs.edit()
             .putString("backup_folder_uri", uri.toString())
             .putString(

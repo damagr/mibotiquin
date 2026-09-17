@@ -10,31 +10,27 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 
 /**
- * Analyzer de códigos: CN (EAN-13 del envase español) y DataMatrix GS1 (caducidad/lote).
- * El modo (isDataMatrix) decide qué formatos se buscan y qué callback se dispara.
+ * Analyzer multi-formato: EAN-13/EAN-8/UPC-A/UPC-E (para CN) + DataMatrix (caducidad).
+ * El callback recibe el raw and si es DataMatrix.
  */
 class BarcodeAnalyzer(
-    private val isDataMatrix: Boolean,
     private val onBarcodeDetected: (raw: String, isDataMatrix: Boolean) -> Unit
 ) : ImageAnalysis.Analyzer {
 
     private val scanner = BarcodeScanning.getClient(
-        if (isDataMatrix) {
-            BarcodeScannerOptions.Builder()
-                .setBarcodeFormats(Barcode.FORMAT_DATA_MATRIX)
-                .build()
-        } else {
-            BarcodeScannerOptions.Builder()
-                .setBarcodeFormats(
-                    Barcode.FORMAT_EAN_13,
-                    Barcode.FORMAT_EAN_8,
-                    Barcode.FORMAT_UPC_A,
-                    Barcode.FORMAT_UPC_E
-                )
-                .build()
-        }
+        BarcodeScannerOptions.Builder()
+            .setBarcodeFormats(
+                Barcode.FORMAT_EAN_13,
+                Barcode.FORMAT_EAN_8,
+                Barcode.FORMAT_UPC_A,
+                Barcode.FORMAT_UPC_E,
+                Barcode.FORMAT_DATA_MATRIX,
+                Barcode.FORMAT_CODE_128
+            )
+            .build()
     )
 
+    @Volatile
     private var hasDetected = false
 
     @OptIn(ExperimentalGetImage::class)
@@ -44,15 +40,17 @@ class BarcodeAnalyzer(
             return
         }
         val mediaImage = imageProxy.image ?: run {
-            imageProxy.close(); return
+            imageProxy.close()
+            return
         }
         val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
 
         scanner.process(image)
             .addOnSuccessListener { barcodes ->
-                barcodes.firstOrNull()?.rawValue?.let { code ->
+                barcodes.firstOrNull()?.let { barcode ->
                     hasDetected = true
-                    onBarcodeDetected(code, isDataMatrix)
+                    val isDm = barcode.format == Barcode.FORMAT_DATA_MATRIX
+                    barcode.rawValue?.let { onBarcodeDetected(it, isDm) }
                 }
             }
             .addOnCompleteListener { imageProxy.close() }

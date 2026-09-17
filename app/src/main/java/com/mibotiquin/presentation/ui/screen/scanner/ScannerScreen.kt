@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -40,6 +42,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -57,9 +60,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mibotiquin.R
+import com.mibotiquin.presentation.ui.components.MonthYearPickerDialog
 import java.util.concurrent.Executors
 
 @Composable
@@ -71,23 +75,38 @@ fun ScannerScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+
     val step by viewModel.step.collectAsStateWithLifecycle()
     val cn by viewModel.cn.collectAsStateWithLifecycle()
-    val cimaResult by viewModel.cimaResult.collectAsStateWithLifecycle()
-    val dmExpiry by viewModel.dataMatrixExpiry.collectAsStateWithLifecycle()
+    val cimaName by viewModel.cimaName.collectAsStateWithLifecycle()
+    val cimaFound by viewModel.cimaFound.collectAsStateWithLifecycle()
+    val dmExpiry by viewModel.dmExpiry.collectAsStateWithLifecycle()
+    val dmConfirmed by viewModel.dmConfirmed.collectAsStateWithLifecycle()
 
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                PackageManager.PERMISSION_GRANTED
+                    PackageManager.PERMISSION_GRANTED
         )
     }
+    var showPermissionDialog by remember { mutableStateOf(false) }
     var isTorchOn by remember { mutableStateOf(false) }
     var camera by remember { mutableStateOf<androidx.camera.core.Camera?>(null) }
+    var showManualExpiryPicker by remember { mutableStateOf(false) }
+    var analyzer by remember { mutableStateOf<BarcodeAnalyzer?>(null) }
+
+    // Cada vez que se entra en una etapa de lectura, reiniciar el detector
+    LaunchedEffect(step) {
+        if (step == ScanStep.ReadCn || step == ScanStep.ReadDataMatrix) {
+            analyzer?.reset()
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { granted -> hasCameraPermission = granted }
+    ) { granted ->
+        if (!granted) showPermissionDialog = true
+    }
 
     LaunchedEffect(Unit) {
         if (viewModel.useCamera && !hasCameraPermission) {
@@ -99,105 +118,153 @@ fun ScannerScreen(
         onDispose { cameraExecutor.shutdown() }
     }
 
+    // DataMatrix confirmado (lectura o manual) → entregar resultado a Home y volver
+    LaunchedEffect(dmConfirmed) {
+        if (dmConfirmed) {
+            onScanComplete(cn ?: "", cimaName, dmExpiry)
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
+
+        // Capa de cámara SOLO en etapas de lectura con permiso y cámara activada
+        val showCamera = hasCameraPermission && viewModel.useCamera &&
+                (step == ScanStep.ReadCn || step == ScanStep.ReadDataMatrix)
+
+        if (showCamera) {
+            CameraPreviewLayer(
+                lifecycleOwner = lifecycleOwner,
+                cameraExecutor = cameraExecutor,
+                onBarcode = viewModel::onBarcodeScanned,
+                onCameraReady = { camera = it },
+                onAnalyzerCreated = { analyzer = it }
+            )
+            ScanOverlay(
+                label = if (step == ScanStep.ReadCn) {
+                    "Apunta al código de barras de la caja"
+                } else {
+                    "Apunta al DataMatrix del envase"
+                }
+            )
+            ScannerControls(
+                isTorchOn = isTorchOn,
+                onTorchToggle = {
+                    isTorchOn = !isTorchOn
+                    camera?.cameraControl?.enableTorch(isTorchOn)
+                },
+                onBack = onBack,
+                bottomButtonText = if (step == ScanStep.ReadCn) {
+                    "Introducir CN a mano"
+                } else {
+                    "Introducir fecha a mano"
+                },
+                onBottomButton = {
+                    if (step == ScanStep.ReadCn) {
+                        viewModel.onManualCnRequested()
+                    } else {
+                        showManualExpiryPicker = true
+                    }
+                }
+            )
+        }
+
+        // Contenido por etapa (exclusivo: nunca se solapa con la cámara)
         when (step) {
             ScanStep.ReadCn -> {
-                if (hasCameraPermission) {
-                    CameraPreview(
-                        lifecycleOwner = lifecycleOwner,
-                        cameraExecutor = cameraExecutor,
-                        isDataMatrix = false,
-                        onBarcode = { raw, isDm -> viewModel.onBarcodeScanned(raw, isDm) },
-                        onCameraReady = { camera = it },
-                        isTorchOn = isTorchOn
+                if (!viewModel.useCamera) {
+                    ManualCnScreen(
+                        onConfirm = viewModel::onManualCnEntered,
+                        onCancel = onBack
                     )
-                    ScanOverlay()
-                    ScannerControls(
-                        isTorchOn = isTorchOn,
-                        onTorchToggle = {
-                            isTorchOn = !isTorchOn
-                            camera?.cameraControl?.enableTorch(isTorchOn)
-                        },
-                        onBack = onBack,
-                        hintText = "Encuadra el CN de la esquina de la caja",
-                        actionText = "Introducir CN a mano",
-                        onAction = viewModel::onManualCnRequested
-                    )
-                } else {
-                    CameraDisabledState(onBack = onBack)
                 }
+                // si cámara ON: solo la capa de cámara ya pintada
             }
 
             ScanStep.ManualCn -> {
-                ManualCnStep(
-                    onConfirm = viewModel::onCnConfirmed,
-                    onCancel = {
-                        if (viewModel.useCamera) viewModel.onManualCnCancelled() else onBack()
-                    }
+                ManualCnScreen(
+                    onConfirm = viewModel::onManualCnEntered,
+                    onCancel = if (viewModel.useCamera) viewModel::onRescan else onBack
                 )
             }
 
             ScanStep.ConsultingCima -> {
-                ConsultingStep()
+                LoadingScreen()
             }
 
-            ScanStep.CnNotFound -> {
-                CnNotFoundStep(
+            ScanStep.CnResult -> {
+                CnResultScreen(
                     cn = cn,
-                    onManualMedication = {
-                        // Formulario manual completo en Home (nombre + fecha a mano)
+                    cimaName = cimaName,
+                    cimaFound = cimaFound,
+                    onContinue = {
+                        if (!viewModel.onContinueAfterCima()) {
+                            // Cámara OFF → formulario directo con nombre CIMA
+                            onScanComplete(cn ?: "", cimaName, null)
+                        }
+                        // cámara ON → el VM ya pasó a DataMatrix
+                    },
+                    onManualProduct = {
                         onScanComplete(cn ?: "", null, null)
                     },
-                    onBack = { viewModel.reset() }
+                    onRescan = viewModel::onRescan,
+                    onCancel = onBack
                 )
             }
 
-            ScanStep.ReadDataMatrix -> {
-                DataMatrixStep(
-                    medicamentoName = (cimaResult as? CimaLookupResult.Success)?.medicamento?.nombre,
-                    dmExpiry = dmExpiry,
-                    onScanDataMatrix = { /* la cámara ya está activa; se activa a continuación */ },
-                    onManualDate = {
-                        // Continuar sin caducidad (el sheet la pedirá manual)
-                        viewModel.skipDataMatrix()
-                        onScanComplete(cn ?: "", (cimaResult as? CimaLookupResult.Success)?.medicamento?.nombre, null)
-                    },
-                    onContinue = {
-                        onScanComplete(
-                            cn ?: "",
-                            (cimaResult as? CimaLookupResult.Success)?.medicamento?.nombre,
-                            dmExpiry
-                        )
-                    },
-                    onBack = { viewModel.reset() }
-                )
-            }
+            ScanStep.ReadDataMatrix -> Unit // solo capa de cámara ya pintada
         }
+    }
 
-        // Cámara DataMatrix activa dentro de ReadDataMatrix cuando el usuario pulsa escanear
-        if (step == ScanStep.ReadDataMatrix && hasCameraPermission && viewModel.useCamera) {
-            DataMatrixCameraLayer(
-                lifecycleOwner = lifecycleOwner,
-                cameraExecutor = cameraExecutor,
-                onBarcode = viewModel::onDataMatrixScanned
-            )
-        }
+    // Diálogo: permiso de cámara denegado
+    if (showPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = { showPermissionDialog = false },
+            title = { Text(stringResource(R.string.scanner_permission_title)) },
+            text = { Text(stringResource(R.string.scanner_permission_message)) },
+            confirmButton = {
+                Button(onClick = {
+                    showPermissionDialog = false
+                    permissionLauncher.launch(Manifest.permission.CAMERA)
+                }) { Text("Conceder permiso") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showPermissionDialog = false
+                    viewModel.onManualCnRequested()
+                }) { Text("Introducir CN a mano") }
+            }
+        )
+    }
+
+    // Picker de caducidad manual (MM/AAAA) — fallo/salto del DataMatrix
+    if (showManualExpiryPicker) {
+        MonthYearPickerDialog(
+            initial = java.time.YearMonth.now().plusYears(1),
+            onConfirm = { ym ->
+                showManualExpiryPicker = false
+                viewModel.onManualExpiry(ym.year, ym.monthValue)
+            },
+            onDismiss = { showManualExpiryPicker = false }
+        )
     }
 }
 
-// ---- Capa de cámara ----
+// ---- Componentes ----
 
 @Composable
-private fun CameraPreview(
+private fun CameraPreviewLayer(
     lifecycleOwner: androidx.lifecycle.LifecycleOwner,
     cameraExecutor: java.util.concurrent.Executor,
-    isDataMatrix: Boolean,
     onBarcode: (String, Boolean) -> Unit,
     onCameraReady: (androidx.camera.core.Camera?) -> Unit,
-    isTorchOn: Boolean
+    onAnalyzerCreated: (BarcodeAnalyzer) -> Unit
 ) {
     val context = LocalContext.current
-    val analyzer = remember(isDataMatrix) { BarcodeAnalyzer(isDataMatrix, onBarcode) }
+    val analyzer = remember { BarcodeAnalyzer(onBarcodeDetected = onBarcode) }
+    DisposableEffect(analyzer) {
+        onAnalyzerCreated(analyzer)
+        onDispose { /* cleanup handled by DisposableEffect de la App */ }
+    }
 
     AndroidView(
         modifier = Modifier.fillMaxSize(),
@@ -215,13 +282,14 @@ private fun CameraPreview(
                     .also { it.setAnalyzer(cameraExecutor, analyzer) }
 
                 cameraProvider.unbindAll()
-                val cam = cameraProvider.bindToLifecycle(
-                    lifecycleOwner,
-                    CameraSelector.DEFAULT_BACK_CAMERA,
-                    preview,
-                    analysis
+                onCameraReady(
+                    cameraProvider.bindToLifecycle(
+                        lifecycleOwner,
+                        CameraSelector.DEFAULT_BACK_CAMERA,
+                        preview,
+                        analysis
+                    )
                 )
-                onCameraReady(cam)
             }, ContextCompat.getMainExecutor(ctx))
             previewView
         }
@@ -229,20 +297,7 @@ private fun CameraPreview(
 }
 
 @Composable
-private fun DataMatrixCameraLayer(
-    lifecycleOwner: androidx.lifecycle.LifecycleOwner,
-    cameraExecutor: java.util.concurrent.Executor,
-    onBarcode: (String) -> Unit
-) {
-    // Reusa el preview general: el analyzer del paso CN ya pasó a DataMatrix
-    // mediante reset(); aquí solo mostramos el overlay correspondiente
-    ScanOverlay(label = "Escanea el DataMatrix (caducidad y lote)")
-}
-
-// ---- Overlay y controles ----
-
-@Composable
-private fun ScanOverlay(label: String? = null) {
+private fun ScanOverlay(label: String?) {
     val infiniteTransition = rememberInfiniteTransition(label = "scan_pulse")
     val pulse by infiniteTransition.animateFloat(
         initialValue = 1f,
@@ -262,17 +317,14 @@ private fun ScanOverlay(label: String? = null) {
             Box(
                 modifier = Modifier
                     .size((260 * pulse).dp, (140 * pulse).dp)
-                    .border(
-                        width = 2.dp,
-                        color = MaterialTheme.colorScheme.primary,
-                        shape = RoundedCornerShape(16.dp)
-                    )
+                    .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
             )
             label?.let {
                 Text(
                     text = it,
                     color = Color.White,
                     style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = 16.dp)
                 )
             }
@@ -285,9 +337,8 @@ private fun ScannerControls(
     isTorchOn: Boolean,
     onTorchToggle: () -> Unit,
     onBack: () -> Unit,
-    hintText: String,
-    actionText: String,
-    onAction: () -> Unit
+    bottomButtonText: String,
+    onBottomButton: () -> Unit
 ) {
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     Box(modifier = Modifier.fillMaxSize()) {
@@ -323,29 +374,36 @@ private fun ScannerControls(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(24.dp)
         ) {
-            Text(
-                text = hintText,
-                color = Color.White,
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center
-            )
-            OutlinedButton(
-                onClick = onAction,
-                modifier = Modifier.padding(top = 16.dp)
+            Button(
+                onClick = onBottomButton,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text(actionText, color = Color.White)
+                Text(bottomButtonText)
             }
         }
     }
 }
 
-// ---- Pasos ----
+@Composable
+private fun LoadingScreen() {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        CircularProgressIndicator()
+        Text(
+            text = "Consultando CIMA…",
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(top = 16.dp)
+        )
+    }
+}
 
 @Composable
-private fun ManualCnStep(
+private fun ManualCnScreen(
     onConfirm: (String) -> Unit,
     onCancel: () -> Unit
 ) {
@@ -368,7 +426,7 @@ private fun ManualCnStep(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(vertical = 8.dp)
+            modifier = Modifier.padding(vertical = 16.dp)
         )
         OutlinedTextField(
             value = input,
@@ -380,73 +438,32 @@ private fun ManualCnStep(
                 .fillMaxWidth()
                 .padding(vertical = 16.dp)
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = onCancel) { Text("Cancelar") }
-            Button(onClick = { onConfirm(input) }, enabled = valid) {
-                Text("Consultar")
-            }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            OutlinedButton(
+                onClick = onCancel,
+                modifier = Modifier.weight(1f)
+            ) { Text("Cancelar") }
+            Button(
+                onClick = { onConfirm(input) },
+                enabled = valid,
+                modifier = Modifier.weight(1f)
+            ) { Text("Consultar CIMA") }
         }
     }
 }
 
 @Composable
-private fun ConsultingStep() {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        CircularProgressIndicator()
-        Text(
-            text = "Consultando CIMA…",
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.padding(top = 16.dp)
-        )
-    }
-}
-
-@Composable
-private fun CnNotFoundStep(
+private fun CnResultScreen(
     cn: String?,
-    onManualMedication: () -> Unit,
-    onBack: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "CN ${cn ?: ""} no encontrado",
-            style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center
-        )
-        Text(
-            text = "No se ha encontrado este código en CIMA. Puedes introducir el medicamento a mano.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(vertical = 8.dp)
-        )
-        Button(onClick = onManualMedication, modifier = Modifier.padding(top = 16.dp)) {
-            Text("Introducir medicamento a mano")
-        }
-        OutlinedButton(onClick = onBack, modifier = Modifier.padding(top = 8.dp)) {
-            Text("Volver a escanear")
-        }
-    }
-}
-
-@Composable
-private fun DataMatrixStep(
-    medicamentoName: String?,
-    dmExpiry: String?,
-    onScanDataMatrix: () -> Unit,
-    onManualDate: () -> Unit,
+    cimaName: String?,
+    cimaFound: Boolean,
     onContinue: () -> Unit,
-    onBack: () -> Unit
+    onManualProduct: () -> Unit,
+    onRescan: () -> Unit,
+    onCancel: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -455,74 +472,71 @@ private fun DataMatrixStep(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "Producto encontrado",
-            style = MaterialTheme.typography.headlineSmall
-        )
-        Text(
-            text = medicamentoName ?: "",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(vertical = 8.dp)
-        )
-        dmExpiry?.let {
+        if (cimaFound) {
             Text(
-                text = "Caducidad: ${formatYearMonth(it)}",
-                style = MaterialTheme.typography.titleLarge
+                text = "Medicamento encontrado",
+                style = MaterialTheme.typography.headlineSmall,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = cimaName ?: "",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+            Text(
+                text = "CN: ${cn ?: ""}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            Text(
+                text = "CN ${cn ?: ""} no encontrado",
+                style = MaterialTheme.typography.headlineSmall,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "No está en la base de datos CIMA. Puedes introducirlo a mano.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(vertical = 8.dp)
             )
         }
-        Button(
-            onClick = onContinue,
+
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 16.dp)
+                .padding(top = 24.dp)
         ) {
-            Text("Continuar")
+            if (cimaFound) {
+                Button(
+                    onClick = onContinue,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                ) { Text("Continuar") }
+            } else {
+                Button(
+                    onClick = onManualProduct,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                ) { Text("Introducir producto a mano") }
+            }
+            OutlinedButton(
+                onClick = onRescan,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+            ) { Text("Volver a escanear") }
+            TextButton(
+                onClick = onCancel,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+            ) { Text("Cancelar") }
         }
-        OutlinedButton(
-            onClick = onManualDate,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp)
-        ) {
-            Text("Introducir fecha a mano")
-        }
-        OutlinedButton(onClick = onBack, modifier = Modifier.padding(top = 8.dp)) {
-            Text("Volver a escanear")
-        }
-    }
-}
-
-@Composable
-private fun CameraDisabledState(onBack: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = stringResource(R.string.scanner_permission_title),
-            style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center
-        )
-        Text(
-            text = stringResource(R.string.scanner_permission_message),
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(vertical = 16.dp)
-        )
-        Button(onClick = onBack) { Text("Volver") }
-    }
-}
-
-private fun formatYearMonth(yyyyMinusMM: String): String {
-    return try {
-        val parts = yyyyMinusMM.split("-")
-        "${parts[1].padStart(2, '0')}/${parts[0]}"
-    } catch (_: Exception) {
-        yyyyMinusMM
     }
 }

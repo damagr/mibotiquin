@@ -2,6 +2,7 @@ package com.mibotiquin.presentation.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -14,11 +15,13 @@ import com.mibotiquin.presentation.ui.screen.home.HomeScreen
 import com.mibotiquin.presentation.ui.screen.home.HomeViewModel
 import com.mibotiquin.presentation.ui.screen.scanner.ScannerScreen
 import com.mibotiquin.presentation.ui.screen.scanner.ScannerViewModel
+import com.mibotiquin.presentation.ui.screen.settings.SettingsScreen
 import com.mibotiquin.presentation.ui.screen.setup.SetupScreen
 
 object AppDestinations {
     const val HOME = "home"
     const val SCANNER = "scanner"
+    const val SETTINGS = "settings"
     const val DEEP_LINK_SCAN_URI = "mibotiquin://scan"
     const val KEY_SCANNED_CN = "scanned_cn"
     const val KEY_SCANNED_NAME = "scanned_name"
@@ -28,9 +31,7 @@ object AppDestinations {
 @Composable
 fun AppNavHost(viewModelFactory: ViewModelProvider.Factory) {
     val navController = rememberNavController()
-    val container = MiBotiquinApplication.container(
-        androidx.compose.ui.platform.LocalContext.current
-    )
+    val container = MiBotiquinApplication.container(LocalContext.current)
     val startDestination = if (container.preferences.isFirstRun) "setup" else AppDestinations.HOME
 
     NavHost(navController, startDestination = startDestination) {
@@ -61,6 +62,7 @@ fun AppNavHost(viewModelFactory: ViewModelProvider.Factory) {
 
             HomeScreen(
                 onOpenScanner = { navController.navigate(AppDestinations.SCANNER) },
+                onOpenSettings = { navController.navigate(AppDestinations.SETTINGS) },
                 scannedCn = scannedCn,
                 scannedName = scannedName,
                 scannedExpiry = scannedExpiry,
@@ -69,6 +71,15 @@ fun AppNavHost(viewModelFactory: ViewModelProvider.Factory) {
                     entry.savedStateHandle.remove<String>(AppDestinations.KEY_SCANNED_NAME)
                     entry.savedStateHandle.remove<String>(AppDestinations.KEY_SCANNED_EXPIRY)
                 },
+                viewModel = homeViewModel
+            )
+        }
+
+        composable(route = AppDestinations.SETTINGS) {
+            // Settings comparte el HomeViewModel (mismo factory, misma instancia por entry)
+            val homeViewModel: HomeViewModel = viewModel(factory = viewModelFactory)
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
                 viewModel = homeViewModel
             )
         }
