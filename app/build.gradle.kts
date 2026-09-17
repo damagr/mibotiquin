@@ -27,8 +27,8 @@ android {
         applicationId = "com.mibotiquin"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.1.1"
     }
 
     buildTypes {
@@ -90,6 +90,9 @@ dependencies {
     implementation("androidx.camera:camera-camera2:1.4.2")
     implementation("androidx.camera:camera-lifecycle:1.4.2")
     implementation("androidx.camera:camera-view:1.4.2")
+
+    // SAF folder operations (backup en carpeta del usuario)
+    implementation("androidx.documentfile:documentfile:1.0.1")
 
     // OkHttp + Retrofit + Gson (auto-update)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")

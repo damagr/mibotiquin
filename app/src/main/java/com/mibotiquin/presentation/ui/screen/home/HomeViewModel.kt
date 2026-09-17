@@ -244,24 +244,31 @@ class HomeViewModel(
         }
     }
 
-    /** Inicia la descarga de la actualización (con backup previo) */
+    /** Inicia la descarga de la actualización (con backup previo obligatorio) */
     fun startUpdate(release: com.mibotiquin.data.api.GitHubRelease) {
         _updateState.value = UpdateState.Downloading(0)
         viewModelScope.launch {
             try {
-                // 1. Backup automático en la carpeta del usuario
+                // 1. Backup obligatorio en la carpeta del usuario (opción A)
                 val activeId = _activeCabinet.value?.id ?: return@launch
                 val backupFolderUri = preferences.backupFolderUri
-                val backupUri = backupFolderUri?.let { Uri.parse(it) }
-                    ?: return@launch
+                    ?: run {
+                        _updateState.value = UpdateState.Error(
+                            "No hay carpeta de backups configurada. Elige una en ⋮ → Carpeta de backups."
+                        )
+                        return@launch
+                    }
 
-                val timestamp = System.currentTimeMillis()
-                val backupFileName = "backup_${BuildConfig.VERSION_NAME}_$timestamp.json"
-                val backupUriWithName = backupUri.buildUpon().appendPath(backupFileName).build()
-
-                val backupOk = transferManager.exportCabinet(activeId, backupUriWithName)
+                val fileName = "mibotiquin_backup_${BuildConfig.VERSION_NAME}_${System.currentTimeMillis()}.json"
+                val backupOk = transferManager.exportCabinetToFolder(
+                    activeId,
+                    android.net.Uri.parse(backupFolderUri),
+                    fileName
+                )
                 if (!backupOk) {
-                    _updateState.value = UpdateState.Error("Error al crear backup de seguridad")
+                    _updateState.value = UpdateState.Error(
+                        "No se pudo crear el backup. Revisa la carpeta en ⋮ → Carpeta de backups."
+                    )
                     return@launch
                 }
 

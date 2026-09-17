@@ -2,6 +2,7 @@ package com.mibotiquin.data.transfer
 
 import android.content.Context
 import android.net.Uri
+import androidx.documentfile.provider.DocumentFile
 import com.google.gson.Gson
 import com.mibotiquin.domain.model.Category
 import com.mibotiquin.domain.model.Product
@@ -83,6 +84,22 @@ class CabinetTransferManager(
             )
         )
     }.getOrNull()
+
+    /** Exporta a una carpeta SAF (árbol elegido por el usuario) usando DocumentFile. */
+    suspend fun exportCabinetToFolder(
+        cabinetId: String,
+        treeUri: Uri,
+        fileName: String
+    ): Boolean = runCatching {
+        val folder = DocumentFile.fromTreeUri(context, treeUri)
+            ?: error("Carpeta de backups no accesible")
+        val doc = folder.createFile("application/json", fileName)
+            ?: error("No se pudo crear el fichero en la carpeta")
+        val json = exportJson(cabinetId) ?: error("No se pudo leer el botiquín")
+        context.contentResolver.openOutputStream(doc.uri)?.use { out ->
+            out.write(json.toByteArray(Charsets.UTF_8))
+        } ?: error("No se pudo escribir el fichero")
+    }.isSuccess
 
     // ---- Importar ----
 
