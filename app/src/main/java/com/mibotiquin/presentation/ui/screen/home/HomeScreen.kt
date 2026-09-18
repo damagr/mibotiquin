@@ -104,6 +104,16 @@ fun HomeScreen(
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { }
+
+    // Permiso especial "instalar apps desconocidas" (API 26+): al volver de Ajustes, instala
+    val installPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        val st = viewModel.updateState.value
+        if (st is UpdateState.ReadyToInstall && !viewModel.needsInstallPermission()) {
+            viewModel.installApk(st.file)
+        }
+    }
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= 33 &&
             androidx.core.content.ContextCompat.checkSelfPermission(
@@ -152,6 +162,12 @@ fun HomeScreen(
                 activeCabinet = activeCabinet,
                 onSelect = viewModel::selectCabinet,
                 modifier = Modifier.weight(1f)
+            )
+            // Versión: elemento separado, a la izquierda del botón de ajustes
+            Text(
+                text = "v${BuildConfig.VERSION_NAME}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )
             IconButton(onClick = onOpenSettings) {
                 Icon(
@@ -274,7 +290,20 @@ fun HomeScreen(
         }
         is UpdateState.ReadyToInstall -> {
             UpdateReadyDialog(
-                onInstall = { viewModel.installApk(state.file) },
+                onInstall = {
+                    val file = state.file
+                    if (viewModel.needsInstallPermission()) {
+                        // Abrir ajustes de "fuentes desconocidas"; al volver, el launcher instala
+                        val intent = Intent(
+                            android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES
+                        ).apply {
+                            data = Uri.parse("package:${context.packageName}")
+                        }
+                        installPermissionLauncher.launch(intent)
+                    } else {
+                        viewModel.installApk(file)
+                    }
+                },
                 onDismiss = viewModel::dismissUpdateDialog
             )
         }
@@ -298,25 +327,15 @@ private fun CabinetHeader(
     modifier: Modifier = Modifier
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
-    val version = "v${BuildConfig.VERSION_NAME}"
 
     if (cabinets.size <= 1 && activeCabinet != null) {
-        Row(
-            modifier = modifier,
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = activeCabinet.name,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = version,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-            )
-        }
+        // Un solo botiquín: solo el nombre, sin desplegable ni versión
+        Text(
+            text = activeCabinet.name,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = modifier
+        )
         return
     }
 
@@ -326,11 +345,6 @@ private fun CabinetHeader(
                 text = activeCabinet?.name ?: "Botiquín",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary
-            )
-            Text(
-                text = version,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
             )
             Icon(
                 imageVector = Icons.Filled.ArrowDropDown,

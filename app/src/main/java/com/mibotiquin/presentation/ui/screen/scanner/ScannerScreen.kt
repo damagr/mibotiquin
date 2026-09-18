@@ -218,6 +218,7 @@ fun ScannerScreen(
     // Diálogo: permiso de cámara denegado
     if (showPermissionDialog) {
         AlertDialog(
+            shape = androidx.compose.ui.graphics.RectangleShape,
             onDismissRequest = { showPermissionDialog = false },
             title = { Text(stringResource(R.string.scanner_permission_title)) },
             text = { Text(stringResource(R.string.scanner_permission_message)) },

@@ -298,13 +298,13 @@ class HomeViewModel(
     }
 
     fun installApk(file: java.io.File) {
-        val activity = context as? Activity ?: return
+        // Sin cast a Activity: FLAG_ACTIVITY_NEW_TASK permite lanzar desde applicationContext
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
         }
-        activity.startActivity(intent)
+        context.startActivity(intent)
     }
 
     fun dismissUpdateDialog() { _updateState.value = UpdateState.UpToDate }

@@ -27,6 +27,7 @@ fun UpdateAvailableDialog(
     onDismiss: () -> Unit
 ) {
     AlertDialog(
+        shape = androidx.compose.ui.graphics.RectangleShape,
         onDismissRequest = onDismiss,
         title = { Text("Nueva versión disponible") },
         text = {
@@ -56,6 +57,7 @@ fun UpdateAvailableDialog(
 @Composable
 fun UpdateDownloadingDialog(progress: Int) {
     AlertDialog(
+        shape = androidx.compose.ui.graphics.RectangleShape,
         onDismissRequest = {},
         title = { Text("Descargando actualización…") },
         text = {
@@ -78,6 +80,7 @@ fun UpdateReadyDialog(
     onDismiss: () -> Unit
 ) {
     AlertDialog(
+        shape = androidx.compose.ui.graphics.RectangleShape,
         onDismissRequest = onDismiss,
         title = { Text("Actualización lista") },
         text = { Text("Se instalará la nueva versión ahora.") },
@@ -96,6 +99,7 @@ fun UpdateErrorDialog(
     onDismiss: () -> Unit
 ) {
     AlertDialog(
+        shape = androidx.compose.ui.graphics.RectangleShape,
         onDismissRequest = onDismiss,
         title = { Text("Error") },
         text = { Text(message) },

@@ -114,6 +114,8 @@ class ScannerViewModel(
                 _cimaName.value = null
                 _cimaFound.value = false
             }
+            // Siempre avanzar de etapa: CnResult muestra el resultado (encontrado o no)
+            _step.value = ScanStep.CnResult
         }
     }
 
