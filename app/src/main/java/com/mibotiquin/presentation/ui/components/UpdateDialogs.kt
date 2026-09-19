@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -61,13 +62,16 @@ fun UpdateDownloadingDialog(progress: Int) {
         onDismissRequest = {},
         title = { Text("Descargando actualización…") },
         text = {
-            Column(Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 CircularProgressIndicator(
                     progress = { progress / 100f },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.size(48.dp)
                 )
-                androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
-                Text("$progress%")
+                Text("$progress%", style = MaterialTheme.typography.titleMedium)
             }
         },
         confirmButton = {}
