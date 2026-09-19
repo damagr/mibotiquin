@@ -59,6 +59,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mibotiquin.BuildConfig
 import com.mibotiquin.R
+import com.mibotiquin.data.scan.CnExtractor
 import com.mibotiquin.domain.model.Cabinet
 import com.mibotiquin.domain.model.Category
 import com.mibotiquin.domain.model.ProductUiModel
@@ -192,6 +193,7 @@ fun HomeScreen(
             AddProductSheet(
                 barcode = product.product.barcode,
                 existing = product,
+                prefillCn = CnExtractor.fromEan13(product.product.barcode),
                 onSave = { code, name, category, quantity, expiry ->
                     viewModel.addProduct(code, name, category, quantity, expiry)
                 },
@@ -219,9 +221,18 @@ fun HomeScreen(
                 existing = if (isNewProduct) null else existing,
                 prefillName = if (isNewProduct) scannedName else null,
                 prefillExpiryYearMonth = if (isNewProduct) scannedExpiry else null,
+                prefillCn = if (isNewProduct) barcode else null,
+                prefillCimaName = if (isNewProduct) scannedName else null,
                 onSave = { code, name, category, quantity, expiry ->
                     viewModel.addProduct(code, name, category, quantity, expiry)
                     onScanConsumed()
+                },
+                onDelete = if (isNewProduct) null else {
+                    {
+                        viewModel.onDeleteProduct(existing!!)
+                        viewModel.closeProductSheet()
+                        onScanConsumed()
+                    }
                 },
                 onDismiss = {
                     viewModel.closeProductSheet()

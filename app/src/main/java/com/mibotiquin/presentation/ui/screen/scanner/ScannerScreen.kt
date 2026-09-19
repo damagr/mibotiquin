@@ -336,7 +336,7 @@ private fun ScannerControls(
             onClick = onBack,
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(top = statusBarPadding + 8.dp, start = 16.dp)
+                .padding(top = statusBarPadding + 24.dp, start = 20.dp)
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -348,7 +348,7 @@ private fun ScannerControls(
             onClick = onTorchToggle,
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(top = statusBarPadding + 8.dp, end = 16.dp)
+                .padding(top = statusBarPadding + 24.dp, end = 20.dp)
         ) {
             Icon(
                 imageVector = if (isTorchOn) Icons.Filled.FlashOn else Icons.Filled.FlashOff,
