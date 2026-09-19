@@ -1,20 +1,24 @@
 package com.mibotiquin.data.repository
 
 import com.mibotiquin.data.local.dao.CabinetDao
+import com.mibotiquin.data.local.dao.CustomCategoryDao
 import com.mibotiquin.data.local.dao.ProductDao
 import com.mibotiquin.data.local.entity.CabinetEntity
 import com.mibotiquin.data.local.mapper.toDomain
 import com.mibotiquin.data.local.mapper.toEntity
+import com.mibotiquin.domain.model.Category
 import com.mibotiquin.domain.model.Cabinet
 import com.mibotiquin.domain.model.Product
 import com.mibotiquin.domain.model.ProductUiModel
 import com.mibotiquin.domain.repository.ProductRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 
 class ProductRepositoryImpl(
     private val productDao: ProductDao,
-    private val cabinetDao: CabinetDao
+    private val cabinetDao: CabinetDao,
+    private val customCategoryDao: CustomCategoryDao
 ) : ProductRepository {
 
     // ---- Botiquines ----
@@ -45,6 +49,41 @@ class ProductRepositoryImpl(
 
     override suspend fun getCabinetLastUpdate(id: String): Long =
         productDao.getCabinetLastUpdate(id) ?: 0L
+
+    // ---- Categorías ----
+
+    override fun getAllCategories(): Flow<List<com.mibotiquin.domain.model.Category>> =
+        customCategoryDao.getAll().map { customEntities ->
+            val customCategories = customEntities.map { it.toDomain() }
+            // Predefinida "Medicamentos" siempre primera (order = 0)
+            com.mibotiquin.domain.model.Category.predefined + customCategories.sortedBy { it.order }
+        }
+
+    override suspend fun addCustomCategory(name: String): Category.CustomCategory {
+        val maxOrder = customCategoryDao.getMaxOrder() ?: -1
+        val newOrder = maxOrder + 1
+        val id = java.util.UUID.randomUUID().toString()
+        val entity = com.mibotiquin.data.local.entity.CustomCategoryEntity(
+            id = id,
+            name = name.trim(),
+            order = newOrder
+        )
+        customCategoryDao.insert(entity)
+        return entity.toDomain()
+    }
+
+    override suspend fun updateCustomCategory(category: Category.CustomCategory) {
+        val entity = com.mibotiquin.data.local.entity.CustomCategoryEntity(
+            id = category.id,
+            name = category.displayName,
+            order = category.order
+        )
+        customCategoryDao.insert(entity)
+    }
+
+    override suspend fun deleteCustomCategory(id: String) {
+        customCategoryDao.deleteById(id)
+    }
 
     // ---- Productos ----
 

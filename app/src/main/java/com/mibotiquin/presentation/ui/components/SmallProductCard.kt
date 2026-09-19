@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.mibotiquin.domain.model.Category
 import com.mibotiquin.domain.model.ExpiryStatus
 import com.mibotiquin.domain.model.ProductUiModel
@@ -101,8 +102,7 @@ fun SmallProductCard(
     }
 }
 
-private fun categoryIcon(category: Category) = when (category) {
-    Category.MEDICINE -> Icons.Filled.Medication
-    Category.FIRST_AID -> Icons.Filled.LocalHospital
-    Category.TOPICAL -> Icons.Filled.Healing
+private fun categoryIcon(category: Category): ImageVector = when (category) {
+    is Category.CustomCategory -> Icons.Filled.Medication
+    Category.Medicamentos -> Icons.Filled.Medication
 }

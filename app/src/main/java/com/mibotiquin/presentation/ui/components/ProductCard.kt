@@ -160,7 +160,6 @@ private fun ExpiryChip(
 }
 
 private fun categoryIcon(category: Category): ImageVector = when (category) {
-    Category.MEDICINE -> Icons.Filled.Medication
-    Category.FIRST_AID -> Icons.Filled.LocalHospital
-    Category.TOPICAL -> Icons.Filled.Healing
+    is Category.CustomCategory -> Icons.Filled.Medication // Default icon for custom categories
+    Category.Medicamentos -> Icons.Filled.Medication
 }

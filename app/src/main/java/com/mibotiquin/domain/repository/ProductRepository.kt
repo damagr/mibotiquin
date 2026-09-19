@@ -1,5 +1,6 @@
 package com.mibotiquin.domain.repository
 
+import com.mibotiquin.domain.model.Category
 import com.mibotiquin.domain.model.Cabinet
 import com.mibotiquin.domain.model.Product
 import com.mibotiquin.domain.model.ProductUiModel
@@ -14,6 +15,12 @@ interface ProductRepository {
     suspend fun deleteCabinet(id: String)
     suspend fun cabinetCount(): Int
     suspend fun getCabinetLastUpdate(id: String): Long
+
+    // ---- Categorías ----
+    fun getAllCategories(): Flow<List<Category>>
+    suspend fun addCustomCategory(name: String): Category.CustomCategory
+    suspend fun updateCustomCategory(category: Category.CustomCategory)
+    suspend fun deleteCustomCategory(id: String)
 
     // ---- Productos (scoped al botiquín) ----
     fun getProducts(cabinetId: String): Flow<List<ProductUiModel>>

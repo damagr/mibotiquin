@@ -1,5 +1,7 @@
 package com.mibotiquin.presentation.ui.screen.home
 
+import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -29,6 +31,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Healing
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.Medication
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
@@ -59,7 +62,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mibotiquin.BuildConfig
 import com.mibotiquin.R
-import com.mibotiquin.data.scan.CnExtractor
 import com.mibotiquin.domain.model.Cabinet
 import com.mibotiquin.domain.model.Category
 import com.mibotiquin.domain.model.ProductUiModel
@@ -71,6 +73,7 @@ import com.mibotiquin.presentation.ui.components.UpdateDownloadingDialog
 import com.mibotiquin.presentation.ui.components.UpdateErrorDialog
 import com.mibotiquin.presentation.ui.components.UpdateReadyDialog
 import com.mibotiquin.ui.UpdateState
+import androidx.compose.ui.graphics.vector.ImageVector
 
 @Composable
 fun HomeScreen(
@@ -138,76 +141,58 @@ fun HomeScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-            CabinetHeader(
-                cabinets = cabinets,
-                activeCabinet = activeCabinet,
-                onSelect = viewModel::selectCabinet,
-                modifier = Modifier.weight(1f)
-            )
-            // Versión: elemento separado, a la izquierda del botón de ajustes
-            Text(
-                text = "v${BuildConfig.VERSION_NAME}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-            )
-            IconButton(onClick = onOpenSettings) {
-                Icon(
-                    imageVector = Icons.Filled.Settings,
-                    contentDescription = "Ajustes",
-                    tint = MaterialTheme.colorScheme.primary
+                CabinetHeader(
+                    cabinets = cabinets,
+                    activeCabinet = activeCabinet,
+                    onSelect = viewModel::selectCabinet,
+                    modifier = Modifier.weight(1f)
                 )
+                // Versión: elemento separado, a la izquierda del botón de ajustes
+                Text(
+                    text = "v${BuildConfig.VERSION_NAME}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                )
+                IconButton(onClick = onOpenSettings) {
+                    Icon(
+                        imageVector = Icons.Filled.Settings,
+                        contentDescription = "Ajustes",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
-        }
 
-        // Search bar + botón de escaneo (fuera del searchbar: buscar ≠ introducir)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            SearchBar(
+            // Search bar + botón de escaneo (fuera del searchbar: buscar ≠ introducir)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SearchBar(
+                    query = query,
+                    onQueryChange = viewModel::onSearchQueryChange,
+                    focusRequester = focusRequester,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = onOpenScanner, modifier = Modifier.size(48.dp)) {
+                    Icon(
+                        imageVector = if (useCamera) Icons.Filled.PhotoCamera else Icons.Filled.Add,
+                        contentDescription = if (useCamera) "Escanear producto" else "Añadir producto",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            ProductList(
+                products = products,
                 query = query,
-                onQueryChange = viewModel::onSearchQueryChange,
-                focusRequester = focusRequester,
-                modifier = Modifier.weight(1f)
-            )
-            IconButton(onClick = onOpenScanner, modifier = Modifier.size(48.dp)) {
-                Icon(
-                    imageVector = if (useCamera) Icons.Filled.PhotoCamera else Icons.Filled.Add,
-                    contentDescription = if (useCamera) "Escanear producto" else "Añadir producto",
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-
-        ProductList(
-            products = products,
-            query = query,
-            onAddProduct = onOpenScanner,
-            onProductClick = viewModel::openEditProduct,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 16.dp)
-        )
-    }
-
-    // Edición de producto (tap en card) → sheet pre-rellenado con borrado confirmado
-    if (showProductSheet) {
-        editingProduct?.let { product ->
-            AddProductSheet(
-                barcode = product.product.barcode,
-                existing = product,
-                prefillCn = CnExtractor.fromEan13(product.product.barcode),
-                onSave = { code, name, category, quantity, expiry ->
-                    viewModel.addProduct(code, name, category, quantity, expiry)
-                },
-                onDelete = {
-                    viewModel.onDeleteProduct(product)
-                    viewModel.closeProductSheet()
-                },
-                onDismiss = viewModel::closeProductSheet
+                onAddProduct = onOpenScanner,
+                onProductClick = viewModel::openEditProduct,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 16.dp)
             )
         }
     }
@@ -229,6 +214,7 @@ fun HomeScreen(
                 prefillExpiryYearMonth = if (isNewProduct) scannedExpiry else null,
                 prefillCn = if (isNewProduct) barcode else null,
                 prefillCimaName = if (isNewProduct) scannedName else null,
+                categories = viewModel.allCategories.value,
                 onSave = { code, name, category, quantity, expiry ->
                     viewModel.addProduct(code, name, category, quantity, expiry)
                     onScanConsumed()
@@ -288,7 +274,6 @@ fun HomeScreen(
         }
         else -> Unit
     }
-}
 }
 
 // ---- Componentes internos ----
@@ -469,7 +454,7 @@ private fun EmptyState(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 32.dp)
             )
-            FilledTonalButton(
+            androidx.compose.material3.FilledTonalButton(
                 onClick = onAddProduct,
                 modifier = Modifier.padding(top = 8.dp)
             ) {
@@ -480,8 +465,27 @@ private fun EmptyState(
 }
 
 @Composable
-private fun Category.icon() = when (this) {
-    Category.MEDICINE -> Icons.Filled.Medication
-    Category.FIRST_AID -> Icons.Filled.LocalHospital
-    Category.TOPICAL -> Icons.Filled.Healing
+private fun Category.icon(): ImageVector = when (this) {
+    is Category.CustomCategory -> Icons.Filled.Medication
+    Category.Medicamentos -> Icons.Filled.Medication
+}
+
+// ---- Helpers ----
+
+private fun saveBackupFolder(context: Context, uri: Uri) {
+    try {
+        val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        context.contentResolver.takePersistableUriPermission(uri, flags)
+        val prefs = context.getSharedPreferences("mibotiquin_prefs", Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString("backup_folder_uri", uri.toString())
+            .putString(
+                "backup_folder_display_name",
+                com.mibotiquin.presentation.ui.components.getDisplayName(context.contentResolver, uri)
+            )
+            .apply()
+        android.widget.Toast.makeText(context, "Carpeta de backups actualizada", android.widget.Toast.LENGTH_SHORT).show()
+    } catch (e: Exception) {
+        android.widget.Toast.makeText(context, "Error al guardar carpeta", android.widget.Toast.LENGTH_SHORT).show()
+    }
 }

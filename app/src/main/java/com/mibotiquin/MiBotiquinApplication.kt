@@ -54,7 +54,7 @@ class DiContainer(context: Context) {
     private val database = AppDatabase.getInstance(context)
     val preferences = PreferencesManager(context)
     val productRepository by lazy {
-        ProductRepositoryImpl(database.productDao(), database.cabinetDao())
+        ProductRepositoryImpl(database.productDao(), database.cabinetDao(), database.customCategoryDao())
     }
     val transferManager by lazy { CabinetTransferManager(context, productRepository) }
 
@@ -98,7 +98,8 @@ class DiContainer(context: Context) {
                 transferManager = transferManager,
                 preferences = preferences,
                 updateChecker = updateChecker,
-                context = context
+                context = context,
+                productRepository = productRepository
             ) as T
 
             ScannerViewModel::class.java -> ScannerViewModel(cimaApi, preferences) as T

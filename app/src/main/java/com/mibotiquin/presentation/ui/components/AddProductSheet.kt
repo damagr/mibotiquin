@@ -58,6 +58,7 @@ fun AddProductSheet(
     prefillExpiryYearMonth: String? = null, // "yyyy-MM" del parser GS1 (DataMatrix)
     prefillCn: String? = null,              // CN 6 dígitos para link prospecto CIMA
     prefillCimaName: String? = null,        // nombre CIMA confirmado (solo si existe en CIMA)
+    categories: List<Category>,             // lista de categorías disponibles (Medicamentos + custom)
     onSave: (barcode: String, name: String, category: Category, quantity: Int, expiryDate: Long) -> Unit,
     onDelete: (() -> Unit)? = null,   // solo en edición
     onDismiss: () -> Unit
@@ -68,7 +69,7 @@ fun AddProductSheet(
         mutableStateOf(existing?.product?.name ?: prefillName ?: "")
     }
     var category by rememberSaveable {
-        mutableStateOf(existing?.product?.category ?: Category.MEDICINE)
+        mutableStateOf(existing?.product?.category ?: Category.Medicamentos)
     }
     var quantity by rememberSaveable { mutableIntStateOf(existing?.product?.quantity ?: 1) }
 
@@ -161,7 +162,7 @@ fun AddProductSheet(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Category.entries.forEach { cat ->
+                    categories.forEach { cat ->
                         FilterChip(
                             selected = category == cat,
                             onClick = { category = cat },

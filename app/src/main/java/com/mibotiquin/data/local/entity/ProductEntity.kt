@@ -3,8 +3,6 @@ package com.mibotiquin.data.local.entity
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import com.mibotiquin.domain.model.Category
-
 @Entity(
     tableName = "products",
     indices = [
@@ -19,7 +17,7 @@ data class ProductEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val barcode: String,
     val name: String,
-    val category: Category,
+    val category: String,  // displayName de la categoría (Medicamentos, custom, etc.)
     val quantity: Int,
     val expiryDate: Long,          // epoch millis UTC
     val cabinetId: String,         // FK lógica hacia cabinets

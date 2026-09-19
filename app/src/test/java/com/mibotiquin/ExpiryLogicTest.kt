@@ -27,7 +27,7 @@ class ExpiryLogicTest {
             id = 1,
             barcode = "000",
             name = "Test",
-            category = Category.MEDICINE,
+            category = Category.Medicamentos,
             quantity = quantity,
             expiryDate = expiry,
             cabinetId = "test-cabinet",

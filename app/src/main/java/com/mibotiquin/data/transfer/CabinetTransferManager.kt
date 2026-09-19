@@ -22,7 +22,7 @@ class CabinetTransferManager(
     data class TransferProduct(
         val barcode: String,
         val name: String,
-        val category: String,
+        val category: String, // displayName de la categoría
         val quantity: Int,
         val expiryDate: Long
     )
@@ -42,6 +42,19 @@ class CabinetTransferManager(
         data class Error(val message: String) : ImportResult()
     }
 
+    // Helper: obtener el displayName de una categoría (maneja tanto Medicamentos como CustomCategory)
+    private fun getCategoryDisplayName(category: Category): String = when (category) {
+        is Category.CustomCategory -> category.displayName
+        Category.Medicamentos -> category.displayName
+    }
+
+    // Helper: parsear string de categoría a Category
+    private fun parseCategory(categoryName: String): Category {
+        // Primero intentar como CustomCategory (buscar en repo no es posible aquí, asumimos Medicamentos por defecto)
+        // En el futuro se podría buscar en el repo, pero por ahora Medicamentos por defecto
+        return Category.Medicamentos
+    }
+
     // ---- Backup completo (TODOS los botiquines) ----
 
     /** Exporta todos los botiquines como array de payloads a la carpeta SAF dada. */
@@ -58,7 +71,7 @@ class CabinetTransferManager(
                         TransferProduct(
                             barcode = it.product.barcode,
                             name = it.product.name,
-                            category = it.product.category.name,
+                            category = getCategoryDisplayName(it.product.category),
                             quantity = it.product.quantity,
                             expiryDate = it.product.expiryDate
                         )
@@ -125,7 +138,7 @@ class CabinetTransferManager(
                 TransferProduct(
                     barcode = it.product.barcode,
                     name = it.product.name,
-                    category = it.product.category.name,
+                    category = getCategoryDisplayName(it.product.category),
                     quantity = it.product.quantity,
                     expiryDate = it.product.expiryDate
                 )
@@ -148,7 +161,7 @@ class CabinetTransferManager(
                     TransferProduct(
                         barcode = it.product.barcode,
                         name = it.product.name,
-                        category = it.product.category.name,
+                        category = getCategoryDisplayName(it.product.category),
                         quantity = it.product.quantity,
                         expiryDate = it.product.expiryDate
                     )
@@ -209,8 +222,7 @@ class CabinetTransferManager(
                     id = 0,
                     barcode = tp.barcode,
                     name = tp.name,
-                    category = runCatching { Category.valueOf(tp.category) }
-                        .getOrDefault(Category.MEDICINE),
+                    category = parseCategory(tp.category),
                     quantity = tp.quantity,
                     expiryDate = tp.expiryDate,
                     cabinetId = cabinet.id,

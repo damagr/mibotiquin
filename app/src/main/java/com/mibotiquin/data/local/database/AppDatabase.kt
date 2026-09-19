@@ -4,24 +4,26 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import androidx.room.TypeConverters
+
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.mibotiquin.data.local.dao.CabinetDao
+import com.mibotiquin.data.local.dao.CustomCategoryDao
 import com.mibotiquin.data.local.dao.ProductDao
 import com.mibotiquin.data.local.entity.CabinetEntity
+import com.mibotiquin.data.local.entity.CustomCategoryEntity
 import com.mibotiquin.data.local.entity.ProductEntity
-import com.mibotiquin.domain.model.Category
+
 
 @Database(
-    entities = [ProductEntity::class, CabinetEntity::class],
-    version = 2,
+    entities = [ProductEntity::class, CabinetEntity::class, CustomCategoryEntity::class],
+    version = 3,
     exportSchema = true
 )
-@TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun productDao(): ProductDao
     abstract fun cabinetDao(): CabinetDao
+    abstract fun customCategoryDao(): CustomCategoryDao
 
     companion object {
         @Volatile
@@ -77,6 +79,19 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `custom_categories` (
+                        `id` TEXT NOT NULL PRIMARY KEY,
+                        `name` TEXT NOT NULL,
+                        `order` INTEGER NOT NULL,
+                        `createdAt` INTEGER NOT NULL
+                    )"""
+                )
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -84,19 +99,11 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "mibotiquin.db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .fallbackToDestructiveMigration(false)
                     .build()
                     .also { INSTANCE = it }
             }
         }
     }
-}
-
-class Converters {
-    @androidx.room.TypeConverter
-    fun fromCategory(category: Category): String = category.name
-
-    @androidx.room.TypeConverter
-    fun toCategory(value: String): Category = Category.valueOf(value)
 }

@@ -15,6 +15,7 @@ import com.mibotiquin.domain.model.Cabinet
 import com.mibotiquin.domain.model.Category
 import com.mibotiquin.domain.model.Product
 import com.mibotiquin.domain.model.ProductUiModel
+import com.mibotiquin.domain.repository.ProductRepository
 import com.mibotiquin.domain.usecase.*
 import com.mibotiquin.ui.UpdateState
 import kotlinx.coroutines.Dispatchers
@@ -47,7 +48,8 @@ class HomeViewModel(
     private val transferManager: CabinetTransferManager,
     private val preferences: PreferencesManager,
     private val updateChecker: UpdateChecker,
-    private val context: Context
+    private val context: Context,
+    private val productRepository: ProductRepository
 ) : ViewModel() {
 
     // ---- Configuración ----
@@ -95,6 +97,11 @@ class HomeViewModel(
             checkForUpdate(userInitiated = false)
         }
     }
+
+    // ---- Categorías ----
+
+    val allCategories = productRepository.getAllCategories()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Category.predefined)
 
     // Botiquín importado con versión local más nueva
     private val _hasNewerRemote = MutableStateFlow(false)
