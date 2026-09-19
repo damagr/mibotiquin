@@ -91,6 +91,8 @@ class HomeViewModel(
                 _activeCabinet.value = list.firstOrNull { it.id == saved } ?: list.first()
                 preferences.activeCabinetId = _activeCabinet.value?.id
             }
+            // Comprobación automática de actualizaciones (silenciosa, userInitiated=false)
+            checkForUpdate(userInitiated = false)
         }
     }
 
