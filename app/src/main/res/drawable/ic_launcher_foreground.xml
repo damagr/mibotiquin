@@ -4,8 +4,8 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Pastilla (Medication) - Material Icons Filled -->
+    <!-- Pastilla (Material Icons Filled.medication) escalada a safe zone 66x66 centrada en 108x108 -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M27,54c0,16.57 13.43,30 30,30s30-13.43 30-30-13.43-30-30-30S27,37.43 27,54zM54,30c-13.25,0-24,10.75-24,24s10.75,24 24,24 24-10.75 24-24-10.75-24-24-24zM72,54c0,9.94-8.06,18-18,18s-18-8.06-18-18 8.06-18 18-18 18,8.06 18,18z" />
+        android:pathData="M40.5 54l9 9 18-18m25.28-18.07A53.8 53.8 0 0154 13.25a53.8 53.8 0 01-38.78 13.68A54.09 54.09 0 0013.5 40.5c0 25.16 17.21 46.3 38.78 52.3 17.57-6 38.78-27.14 38.78-52.3 0-4.69-.6-9.23-1.72-13.57z" />
 </vector>
