@@ -2,8 +2,6 @@ name: Release APK
 
 on:
   push:
-    branches: [master]
-    paths: ["app/build.gradle.kts"]
     tags: ["v*"]
 
 permissions:
