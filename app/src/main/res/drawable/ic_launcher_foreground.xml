@@ -4,8 +4,8 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Cruz médica blanca centrada sobre el fondo primary -->
+    <!-- Pastilla (Medication) - Material Icons Filled -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M44,22h20v22h22v20H64v22H44V64H22V44h22z" />
+        android:pathData="M27,54c0,16.57 13.43,30 30,30s30-13.43 30-30-13.43-30-30-30S27,37.43 27,54zM54,30c-13.25,0-24,10.75-24,24s10.75,24 24,24 24-10.75 24-24-10.75-24-24-24zM72,54c0,9.94-8.06,18-18,18s-18-8.06-18-18 8.06-18 18-18 18,8.06 18,18z" />
 </vector>
