@@ -79,7 +79,10 @@ fun SettingsScreen(
     ) { uri -> uri?.let { saveBackupFolder(context, it) } }
 
     MiBotiquinTheme {
-        Surface(modifier = Modifier.fillMaxSize()) {
+        Surface(modifier = Modifier
+            .fillMaxSize()
+            .padding(top = 24.dp)
+        ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // Header
                 Row(

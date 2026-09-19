@@ -122,16 +122,22 @@ fun HomeScreen(
     // Diálogos globales (crear/eliminar botiquín + toast de transferencias) viven en AppNavHost,
     // compartidos con Ajustes. Aquí solo: sheet de producto y diálogos de actualización.
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    // Padding superior fijo (24dp = altura típica status bar) como fallback
+    // para cuando WindowInsets.statusBars aún no está disponible (inicio app)
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .padding(top = 24.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
 
-        // Header: nombre botiquín + versión + ajustes (insets status bar para notches)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+            // Header: nombre botiquín + versión + ajustes (insets status bar para notches)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
             CabinetHeader(
                 cabinets = cabinets,
                 activeCabinet = activeCabinet,
@@ -282,6 +288,7 @@ fun HomeScreen(
         }
         else -> Unit
     }
+}
 }
 
 // ---- Componentes internos ----
