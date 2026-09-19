@@ -1,6 +1,5 @@
 package com.mibotiquin.presentation.ui.screen.home
 
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -30,7 +29,6 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Healing
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.Medication
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
@@ -65,8 +63,6 @@ import com.mibotiquin.domain.model.Cabinet
 import com.mibotiquin.domain.model.Category
 import com.mibotiquin.domain.model.ProductUiModel
 import com.mibotiquin.presentation.ui.components.AddProductSheet
-import com.mibotiquin.presentation.ui.components.CreateCabinetDialog
-import com.mibotiquin.presentation.ui.components.DeleteCabinetDialog
 import com.mibotiquin.presentation.ui.components.ProductCard
 import com.mibotiquin.presentation.ui.components.SearchBar
 import com.mibotiquin.presentation.ui.components.UpdateAvailableDialog
@@ -89,9 +85,6 @@ fun HomeScreen(
     val products by viewModel.products.collectAsStateWithLifecycle()
     val cabinets by viewModel.cabinets.collectAsStateWithLifecycle()
     val activeCabinet by viewModel.activeCabinet.collectAsStateWithLifecycle()
-    val showCreateCabinet by viewModel.showCreateCabinet.collectAsStateWithLifecycle()
-    val cabinetToDelete by viewModel.cabinetToDelete.collectAsStateWithLifecycle()
-    val transferEvent by viewModel.transferEvent.collectAsStateWithLifecycle()
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     val useCamera by viewModel.useCamera.collectAsStateWithLifecycle()
     val showProductSheet by viewModel.showProductSheet.collectAsStateWithLifecycle()
@@ -125,27 +118,8 @@ fun HomeScreen(
         // Sin autofoco: el teclado no se abre solo al entrar
     }
 
-    // SAF: exportar / importar botiquín
-    val exportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json")
-    ) { uri -> uri?.let(viewModel::shareCabinet) }
-    val importLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri -> uri?.let(viewModel::importCabinet) }
-
-    // Selector de carpeta de backups
-    val openDocumentTreeLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocumentTree()
-    ) { uri ->
-        uri?.let { saveBackupFolder(context, it) }
-    }
-
-    LaunchedEffect(transferEvent) {
-        transferEvent?.let {
-            android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show()
-            viewModel.onTransferEventShown()
-        }
-    }
+    // Diálogos globales (crear/eliminar botiquín + toast de transferencias) viven en AppNavHost,
+    // compartidos con Ajustes. Aquí solo: sheet de producto y diálogos de actualización.
 
     Column(modifier = Modifier.fillMaxSize()) {
 
@@ -212,25 +186,7 @@ fun HomeScreen(
         )
     }
 
-    // ---- Diálogos ----
-
-    if (showCreateCabinet) {
-        CreateCabinetDialog(
-            isMandatory = cabinets.isEmpty(),
-            onCreate = viewModel::createCabinet,
-            onDismiss = { viewModel.onShowCreateCabinet(false) }
-        )
-    }
-
-    cabinetToDelete?.let { cabinet ->
-        DeleteCabinetDialog(
-            cabinet = cabinet,
-            onConfirm = { viewModel.deleteCabinet(cabinet.id) },
-            onDismiss = viewModel::onDismissDeleteCabinet
-        )
-    }
-
-    // Edición de producto (tap en card) → diálogo pre-rellenado con borrado confirmado
+    // Edición de producto (tap en card) → sheet pre-rellenado con borrado confirmado
     if (showProductSheet) {
         editingProduct?.let { product ->
             AddProductSheet(
@@ -510,24 +466,4 @@ private fun Category.icon() = when (this) {
     Category.MEDICINE -> Icons.Filled.Medication
     Category.FIRST_AID -> Icons.Filled.LocalHospital
     Category.TOPICAL -> Icons.Filled.Healing
-}
-
-// ---- Helpers ----
-
-private fun saveBackupFolder(context: Context, uri: Uri) {
-    try {
-        val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-        context.contentResolver.takePersistableUriPermission(uri, flags)
-        val prefs = context.getSharedPreferences("mibotiquin_prefs", Context.MODE_PRIVATE)
-        prefs.edit()
-            .putString("backup_folder_uri", uri.toString())
-            .putString(
-                "backup_folder_display_name",
-                com.mibotiquin.presentation.ui.components.getDisplayName(context.contentResolver, uri)
-            )
-            .apply()
-        android.widget.Toast.makeText(context, "Carpeta de backups actualizada", android.widget.Toast.LENGTH_SHORT).show()
-    } catch (e: Exception) {
-        android.widget.Toast.makeText(context, "Error al guardar carpeta", android.widget.Toast.LENGTH_SHORT).show()
-    }
 }

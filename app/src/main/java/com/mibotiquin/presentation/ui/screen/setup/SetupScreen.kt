@@ -50,24 +50,28 @@ fun SetupScreen(
     preferences: PreferencesManager
 ) {
     var step by rememberSaveable { mutableStateOf(SetupStep.CHOOSE_CAMERA) }
+    var folderPickCancelled by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
 
     val treeLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
-        uri?.let { selected ->
+        if (uri == null) {
+            // Picker cancelado → la pantalla ofrece Reintentar / Saltar
+            folderPickCancelled = true
+        } else {
             try {
                 val flags = android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
                         android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                context.contentResolver.takePersistableUriPermission(selected, flags)
-                preferences.backupFolderUri = selected.toString()
+                context.contentResolver.takePersistableUriPermission(uri, flags)
+                preferences.backupFolderUri = uri.toString()
                 preferences.backupFolderDisplayName =
                     com.mibotiquin.presentation.ui.components.getDisplayName(
-                        context.contentResolver, selected
+                        context.contentResolver, uri
                     )
             } catch (_: Exception) {
                 // Provider no persistible: guardamos la URI igualmente
-                preferences.backupFolderUri = selected.toString()
+                preferences.backupFolderUri = uri.toString()
             }
             onComplete()
         }
@@ -85,11 +89,15 @@ fun SetupScreen(
             }
             SetupStep.CHOOSE_FOLDER -> {
                 ChooseFolderStep(
+                    cancelled = folderPickCancelled,
                     onPickFolder = {
                         if (android.os.Build.VERSION.SDK_INT >= 26) {
                             treeLauncher.launch(Uri.EMPTY)
                         }
-                    }
+                    },
+                    // Saltar: sin carpeta SAF → almacenamiento interno va a ser el destino por
+                    // defecto de los backups (Home + diálogo de primer botiquín a continuación)
+                    onSkip = onComplete
                 )
             }
         }
@@ -157,7 +165,9 @@ private fun ChooseCameraStep(
 
 @Composable
 private fun ChooseFolderStep(
-    onPickFolder: () -> Unit
+    cancelled: Boolean,
+    onPickFolder: () -> Unit,
+    onSkip: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -209,13 +219,39 @@ private fun ChooseFolderStep(
             }
         }
 
-        Button(
-            onClick = onPickFolder,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 24.dp)
-        ) {
-            Text("Elegir carpeta")
+        if (cancelled) {
+            Text(
+                text = "No se eligió ninguna carpeta. Puedes reintentarlo o seguir con el almacenamiento interno.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 24.dp)
+            )
+            Button(
+                onClick = onPickFolder,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp)
+            ) {
+                Text("Reintentar")
+            }
+            OutlinedButton(
+                onClick = onSkip,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+            ) {
+                Text("Saltar")
+            }
+        } else {
+            Button(
+                onClick = onPickFolder,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 24.dp)
+            ) {
+                Text("Elegir carpeta")
+            }
         }
     }
 }

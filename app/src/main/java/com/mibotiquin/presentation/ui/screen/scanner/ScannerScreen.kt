@@ -93,14 +93,9 @@ fun ScannerScreen(
     var isTorchOn by remember { mutableStateOf(false) }
     var camera by remember { mutableStateOf<androidx.camera.core.Camera?>(null) }
     var showManualExpiryPicker by remember { mutableStateOf(false) }
-    var analyzer by remember { mutableStateOf<BarcodeAnalyzer?>(null) }
 
-    // Cada vez que se entra en una etapa de lectura, reiniciar el detector
-    LaunchedEffect(step) {
-        if (step == ScanStep.ReadCn || step == ScanStep.ReadDataMatrix) {
-            analyzer?.reset()
-        }
-    }
+    // Analyzer CONTINUO: no guarda estado (sin hasDetected) → nada que reiniciar por etapa.
+    // El ViewModel decide por etapa qué códigos acepta; un EAN en etapa DataMatrix no para nada.
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -136,8 +131,7 @@ fun ScannerScreen(
                 lifecycleOwner = lifecycleOwner,
                 cameraExecutor = cameraExecutor,
                 onBarcode = viewModel::onBarcodeScanned,
-                onCameraReady = { camera = it },
-                onAnalyzerCreated = { analyzer = it }
+                onCameraReady = { camera = it }
             )
             ScanOverlay(
                 label = if (step == ScanStep.ReadCn) {
@@ -257,15 +251,10 @@ private fun CameraPreviewLayer(
     lifecycleOwner: androidx.lifecycle.LifecycleOwner,
     cameraExecutor: java.util.concurrent.Executor,
     onBarcode: (String, Boolean) -> Unit,
-    onCameraReady: (androidx.camera.core.Camera?) -> Unit,
-    onAnalyzerCreated: (BarcodeAnalyzer) -> Unit
+    onCameraReady: (androidx.camera.core.Camera?) -> Unit
 ) {
     val context = LocalContext.current
     val analyzer = remember { BarcodeAnalyzer(onBarcodeDetected = onBarcode) }
-    DisposableEffect(analyzer) {
-        onAnalyzerCreated(analyzer)
-        onDispose { /* cleanup handled by DisposableEffect de la App */ }
-    }
 
     AndroidView(
         modifier = Modifier.fillMaxSize(),

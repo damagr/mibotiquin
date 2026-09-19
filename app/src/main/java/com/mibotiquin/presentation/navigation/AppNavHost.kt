@@ -1,6 +1,8 @@
 package com.mibotiquin.presentation.navigation
 
+import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModelProvider
@@ -8,9 +10,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navDeepLink
 import com.mibotiquin.MiBotiquinApplication
+import com.mibotiquin.presentation.ui.components.CreateCabinetDialog
+import com.mibotiquin.presentation.ui.components.DeleteCabinetDialog
 import com.mibotiquin.presentation.ui.screen.home.HomeScreen
 import com.mibotiquin.presentation.ui.screen.home.HomeViewModel
 import com.mibotiquin.presentation.ui.screen.scanner.ScannerScreen
@@ -31,8 +36,17 @@ object AppDestinations {
 @Composable
 fun AppNavHost(viewModelFactory: ViewModelProvider.Factory) {
     val navController = rememberNavController()
-    val container = MiBotiquinApplication.container(LocalContext.current)
+    val context = LocalContext.current
+    val container = MiBotiquinApplication.container(context)
     val startDestination = if (container.preferences.isFirstRun) "setup" else AppDestinations.HOME
+
+    // UNA sola instancia del HomeViewModel compartida entre Home y Settings (scope Activity)
+    val activity = context as? ComponentActivity
+    val homeViewModel: HomeViewModel = if (activity != null) {
+        viewModel(viewModelStoreOwner = activity, factory = viewModelFactory)
+    } else {
+        viewModel(factory = viewModelFactory)
+    }
 
     NavHost(navController, startDestination = startDestination) {
 
@@ -49,7 +63,6 @@ fun AppNavHost(viewModelFactory: ViewModelProvider.Factory) {
         }
 
         composable(route = AppDestinations.HOME) { entry ->
-            val homeViewModel: HomeViewModel = viewModel(factory = viewModelFactory)
             val scannedCn by entry.savedStateHandle
                 .getStateFlow<String?>(AppDestinations.KEY_SCANNED_CN, null)
                 .collectAsStateWithLifecycle()
@@ -76,8 +89,6 @@ fun AppNavHost(viewModelFactory: ViewModelProvider.Factory) {
         }
 
         composable(route = AppDestinations.SETTINGS) {
-            // Settings comparte el HomeViewModel (mismo factory, misma instancia por entry)
-            val homeViewModel: HomeViewModel = viewModel(factory = viewModelFactory)
             SettingsScreen(
                 onBack = { navController.popBackStack() },
                 viewModel = homeViewModel
@@ -105,6 +116,41 @@ fun AppNavHost(viewModelFactory: ViewModelProvider.Factory) {
                 onBack = { navController.popBackStack() },
                 viewModel = scannerViewModel
             )
+        }
+    }
+
+    // ---- Diálogos globales (visibles desde cualquier pantalla MENOS Setup) ----
+
+    val currentDestination by navController.currentBackStackEntryAsState()
+    val inSetup = currentDestination?.destination?.route == "setup"
+
+    val showCreateCabinet by homeViewModel.showCreateCabinet.collectAsStateWithLifecycle()
+    val cabinetToDelete by homeViewModel.cabinetToDelete.collectAsStateWithLifecycle()
+    val transferEvent by homeViewModel.transferEvent.collectAsStateWithLifecycle()
+
+    if (showCreateCabinet && !inSetup) {
+        CreateCabinetDialog(
+            // Obligatorio si no hay botiquín activo (no depende del valor stale de cabinets)
+            isMandatory = homeViewModel.activeCabinet.value == null,
+            onCreate = homeViewModel::createCabinet,
+            onDismiss = { homeViewModel.onShowCreateCabinet(false) }
+        )
+    }
+
+    cabinetToDelete?.let { cabinet ->
+        DeleteCabinetDialog(
+            cabinet = cabinet,
+            onConfirm = { homeViewModel.deleteCabinet(cabinet.id) },
+            onDismiss = homeViewModel::onDismissDeleteCabinet
+        )
+    }
+
+    LaunchedEffect(transferEvent) {
+        transferEvent?.let {
+            if (!inSetup) {
+                android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show()
+            }
+            homeViewModel.onTransferEventShown()
         }
     }
 }

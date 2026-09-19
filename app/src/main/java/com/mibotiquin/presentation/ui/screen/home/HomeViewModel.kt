@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -76,6 +77,22 @@ class HomeViewModel(
 
     private val _transferEvent = MutableStateFlow<String?>(null)
     val transferEvent: StateFlow<String?> = _transferEvent
+
+    init {
+        // Al arrancar (VM de scope Activity, una vez por sesión):
+        // - con botiquines → restaura el activo persistido (o el primero)
+        // - sin ninguno → pide crear el primero (tras setup o tras borrar el último)
+        viewModelScope.launch {
+            val list = getCabinetsUseCase().first()
+            if (list.isEmpty()) {
+                _showCreateCabinet.value = true
+            } else {
+                val saved = preferences.activeCabinetId
+                _activeCabinet.value = list.firstOrNull { it.id == saved } ?: list.first()
+                preferences.activeCabinetId = _activeCabinet.value?.id
+            }
+        }
+    }
 
     // Botiquín importado con versión local más nueva
     private val _hasNewerRemote = MutableStateFlow(false)
@@ -203,9 +220,16 @@ class HomeViewModel(
     fun deleteCabinet(id: String) {
         viewModelScope.launch {
             deleteCabinetUseCase(id)
-            if (cabinets.value.size <= 1) {
+            // Consulta fresca: el StateFlow cabinets puede ir desactualizado justo tras el delete
+            val remaining = getCabinetsUseCase().first()
+            if (remaining.isEmpty()) {
+                _activeCabinet.value = null
                 preferences.activeCabinetId = null
                 _showCreateCabinet.value = true
+            } else if (_activeCabinet.value?.id == id) {
+                // El eliminado era el activo → pasa al primero restante
+                _activeCabinet.value = remaining.first()
+                preferences.activeCabinetId = remaining.first().id
             }
             _transferEvent.value = "Botiquín eliminado"
             _cabinetToDelete.value = null
@@ -222,16 +246,28 @@ class HomeViewModel(
 
     fun importCabinet(uri: Uri) {
         viewModelScope.launch {
-            when (val result = transferManager.importCabinet(uri)) {
+            when (val result = transferManager.importAny(uri)) {
                 is CabinetTransferManager.ImportResult.Success -> {
                     selectCabinet(result.cabinetId)
                     _transferEvent.value = "Botiquín '${result.name}' importado (${result.productCount} productos)"
+                }
+                is CabinetTransferManager.ImportResult.MultiSuccess -> {
+                    _transferEvent.value =
+                        "Backup restaurado (${result.cabinetCount} botiquines, ${result.productCount} productos)"
                 }
                 is CabinetTransferManager.ImportResult.RejectedOlderLocal ->
                     _transferEvent.value = "Importación rechazada: tu versión local es más reciente"
                 is CabinetTransferManager.ImportResult.Error ->
                     _transferEvent.value = result.message
             }
+        }
+    }
+
+    /** Backup completo: TODOS los botiquines a un JSON (vía SAF) */
+    fun exportBackup(uri: Uri) {
+        viewModelScope.launch {
+            val (ok, count) = transferManager.exportAllTo(uri)
+            _transferEvent.value = if (ok) "Backup exportado ($count botiquines)" else "Error al exportar backup"
         }
     }
 

@@ -36,8 +36,80 @@ class CabinetTransferManager(
 
     sealed class ImportResult {
         data class Success(val cabinetId: String, val name: String, val productCount: Int) : ImportResult()
+        /** Backup completo (todos los botiquines) restaurado */
+        data class MultiSuccess(val cabinetCount: Int, val productCount: Int) : ImportResult()
         data object RejectedOlderLocal : ImportResult()
         data class Error(val message: String) : ImportResult()
+    }
+
+    // ---- Backup completo (TODOS los botiquines) ----
+
+    /** Exporta todos los botiquines como array de payloads a la carpeta SAF dada. */
+    suspend fun exportAllTo(uri: Uri): Pair<Boolean, Int> {
+        return runCatching {
+            val cabinets = repository.getAllCabinets().first()
+            val payloads = cabinets.map { cab ->
+                val products = repository.getProducts(cab.id).first()
+                TransferPayload(
+                    cabinetId = cab.id,
+                    name = cab.name,
+                    updatedAt = repository.getCabinetLastUpdate(cab.id),
+                    products = products.map {
+                        TransferProduct(
+                            barcode = it.product.barcode,
+                            name = it.product.name,
+                            category = it.product.category.name,
+                            quantity = it.product.quantity,
+                            expiryDate = it.product.expiryDate
+                        )
+                    }
+                )
+            }
+            context.contentResolver.openOutputStream(uri)?.use { out ->
+                out.write(gson.toJson(payloads).toByteArray(Charsets.UTF_8))
+            } ?: error("No se pudo escribir el fichero")
+            true to payloads.size
+        }.getOrDefault(false to 0)
+    }
+
+    /**
+     * Importa un fichero detectando el formato automáticamente:
+     * - "[" → array de payloads (backup completo: aplica cada botiquín con su regla de fusión)
+     * - "{" → payload individual (botiquín)
+     */
+    suspend fun importAny(uri: Uri): ImportResult {
+        return try {
+            val json = context.contentResolver.openInputStream(uri)?.use { input ->
+                input.readBytes().toString(Charsets.UTF_8)
+            } ?: return ImportResult.Error("No se pudo leer el fichero")
+
+            val trimmed = json.trimStart()
+            if (trimmed.startsWith("[")) {
+                val payloads = gson.fromJson(json, Array<TransferPayload>::class.java).toList()
+                    ?: return ImportResult.Error("Formato no válido")
+                var productCount = 0
+                var rejected = false
+                payloads.forEach { payload ->
+                    when (val r = applyPayload(payload)) {
+                        is ImportResult.Success -> productCount += r.productCount
+                        is ImportResult.RejectedOlderLocal -> rejected = true
+                        is ImportResult.Error -> return r
+                        else -> Unit
+                    }
+                }
+                if (rejected && productCount == 0) {
+                    ImportResult.RejectedOlderLocal
+                } else {
+                    ImportResult.MultiSuccess(payloads.size, productCount)
+                }
+            } else {
+                val payload = gson.fromJson(json, TransferPayload::class.java)
+                    ?: return ImportResult.Error("Formato no válido")
+                applyPayload(payload)
+            }
+        } catch (e: Exception) {
+            ImportResult.Error("Formato no válido: ${e.message ?: "desconocido"}")
+        }
     }
 
     // ---- Exportar ----
