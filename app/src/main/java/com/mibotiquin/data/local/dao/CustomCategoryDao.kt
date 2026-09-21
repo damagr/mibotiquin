@@ -28,5 +28,5 @@ interface CustomCategoryDao {
     suspend fun deleteAll()
 
     @Query("SELECT MAX(`order`) FROM custom_categories")
-    fun getMaxOrder(): Int?
+    suspend fun getMaxOrder(): Int?
 }
