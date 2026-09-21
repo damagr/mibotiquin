@@ -15,13 +15,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -125,20 +125,17 @@ fun HomeScreen(
     // Diálogos globales (crear/eliminar botiquín + toast de transferencias) viven en AppNavHost,
     // compartidos con Ajustes. Aquí solo: sheet de producto y diálogos de actualización.
 
-    // Padding superior fijo (24dp = altura típica status bar) como fallback
-    // para cuando WindowInsets.statusBars aún no está disponible (inicio app)
-    Box(modifier = Modifier
-        .fillMaxSize()
-        .padding(top = 24.dp)
-    ) {
+    // Status bar height para notches / cutouts (patrón ScannerScreen)
+    val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+
+    Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
 
             // Header: nombre botiquín + versión + ajustes (insets status bar para notches)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.statusBars)
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(top = statusBarPadding, start = 16.dp, end = 16.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 CabinetHeader(

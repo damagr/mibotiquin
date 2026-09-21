@@ -282,6 +282,12 @@ class HomeViewModel(
 
     fun onTransferEventShown() { _transferEvent.value = null }
 
+    // ---- Categorías personalizadas ----
+
+    suspend fun addCustomCategory(name: String) = productRepository.addCustomCategory(name)
+
+    suspend fun deleteCustomCategory(id: String) = productRepository.deleteCustomCategory(id)
+
     // ---- Auto-update ----
 
     fun checkForUpdate(userInitiated: Boolean = false) {

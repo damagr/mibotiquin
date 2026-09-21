@@ -4,10 +4,17 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- medication (Material Icons Filled) - generado como Vector Asset -->
-    <group android:translateX="21" android:translateY="21">
-        <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M40.5 54l9 9 18-18m25.28-18.07A53.8 53.8 0 0154 13.25a53.8 53.8 0 01-38.78 13.68A54.09 54.09 0 0013.5 40.5c0 25.16 17.21 46.3 38.78 52.3 17.57-6 38.78-27.14 38.78-52.3 0-4.69-.6-9.23-1.72-13.57z" />
-    </group>
+    <!-- Pharmacy cross icon (adapted from Flaticon pharmacy icon) -->
+    <!-- White foreground for adaptive icon -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,18 L54,90 M18,54 L90,54 M54,30 L54,78 M30,54 L78,54" />
+    <!-- Rounded cross shape - main vertical bar -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M46,12 L46,96 A6,6 0 0,1 40,102 L68,102 A6,6 0 0,1 62,96 L62,12 A6,6 0 0,1 46,12 Z" />
+    <!-- Rounded cross shape - horizontal bar -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,46 L96,46 A6,6 0 0,1 102,52 L102,56 A6,6 0 0,1 96,62 L12,62 A6,6 0 0,1 6,56 L6,52 A6,6 0 0,1 12,46 Z" />
 </vector>

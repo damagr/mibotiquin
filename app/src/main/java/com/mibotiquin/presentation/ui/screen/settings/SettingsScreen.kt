@@ -13,15 +13,21 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -31,23 +37,31 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewModelScope
 import com.mibotiquin.BuildConfig
+import com.mibotiquin.domain.model.Category
 import com.mibotiquin.presentation.ui.screen.home.HomeViewModel
 import com.mibotiquin.presentation.ui.theme.MiBotiquinTheme
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
@@ -78,6 +92,9 @@ fun SettingsScreen(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri -> uri?.let { saveBackupFolder(context, it) } }
 
+    // Status bar height para notches / cutouts (patrón ScannerScreen)
+    val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+
     MiBotiquinTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
@@ -85,7 +102,7 @@ fun SettingsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(top = statusBarPadding, start = 16.dp, end = 16.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onBack) {
@@ -214,6 +231,13 @@ fun SettingsScreen(
 
                     HorizontalDivider()
 
+                    // === Familias de medicamentos ===
+                    SettingsSection(title = "Familias de medicamentos") {
+                        CategoryManagementSection(viewModel = viewModel)
+                    }
+
+                    HorizontalDivider()
+
                     // === Copias de seguridad ===
                     SettingsSection(title = "Copias de seguridad") {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -297,11 +321,18 @@ fun SettingsScreen(
 
                     // === Versión ===
                     SettingsSection(title = "Acerca de") {
-                        Text(
-                            text = "MiBotiquín v${BuildConfig.VERSION_NAME}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "MiBotiquín v${BuildConfig.VERSION_NAME}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "Icono: \"Farmacia\" de Freepik (Flaticon)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
                     }
 
                     Box(modifier = Modifier.height(32.dp))
@@ -326,6 +357,126 @@ private fun SettingsSection(
             color = MaterialTheme.colorScheme.primary
         )
         content()
+    }
+}
+
+@Composable
+private fun CategoryManagementSection(viewModel: HomeViewModel) {
+    val allCategories by viewModel.allCategories.collectAsStateWithLifecycle()
+    val customCategories = allCategories.filterIsInstance<Category.CustomCategory>()
+    var newCategoryName by remember { mutableStateOf("") }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var categoryToDelete by remember { mutableStateOf<Category.CustomCategory?>(null) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (customCategories.isEmpty()) {
+            Text(
+                text = "No hay familias personalizadas. Pulsa \"Nueva familia\" para crear una.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            customCategories.forEach { category ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = category.displayName,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    IconButton(
+                        onClick = {
+                            categoryToDelete = category
+                            showDeleteConfirm = true
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.DeleteOutline,
+                            contentDescription = "Eliminar familia",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+        }
+
+        OutlinedButton(
+            onClick = {
+                newCategoryName = ""
+                showAddDialog = true
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Nueva familia")
+        }
+    }
+
+    // Diálogo añadir familia
+    if (showAddDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddDialog = false },
+            title = { Text("Nueva familia") },
+            text = {
+                OutlinedTextField(
+                    value = newCategoryName,
+                    onValueChange = { newCategoryName = it },
+                    label = { Text("Nombre de la familia") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (newCategoryName.trim().isNotBlank()) {
+                            val name = newCategoryName.trim()
+                            viewModel.viewModelScope.launch {
+                                viewModel.addCustomCategory(name)
+                            }
+                            showAddDialog = false
+                        }
+                    }
+                ) { Text("Crear") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddDialog = false }) { Text("Cancelar") }
+            }
+        )
+    }
+
+    // Diálogo confirmar eliminar
+    if (showDeleteConfirm) {
+        categoryToDelete?.let { category ->
+            AlertDialog(
+                onDismissRequest = { showDeleteConfirm = false; categoryToDelete = null },
+                title = { Text("Eliminar familia") },
+                text = { Text("¿Eliminar la familia \"${category.displayName}\"? Los productos de esta familia pasarán a \"Medicamentos\".") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            val id = category.id
+                            viewModel.viewModelScope.launch {
+                                viewModel.deleteCustomCategory(id)
+                            }
+                            showDeleteConfirm = false
+                            categoryToDelete = null
+                        },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) { Text("Eliminar") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteConfirm = false; categoryToDelete = null }) { Text("Cancelar") }
+                }
+            )
+        }
     }
 }
 
