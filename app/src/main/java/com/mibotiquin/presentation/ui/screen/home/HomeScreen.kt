@@ -14,14 +14,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -125,8 +122,8 @@ fun HomeScreen(
     // Diálogos globales (crear/eliminar botiquín + toast de transferencias) viven en AppNavHost,
     // compartidos con Ajustes. Aquí solo: sheet de producto y diálogos de actualización.
 
-    // Status bar height para notches / cutouts (patrón ScannerScreen)
-    val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    // Status bar height fijo (24dp estándar Android) en lugar de detección automática
+    val statusBarPadding = 24.dp
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {

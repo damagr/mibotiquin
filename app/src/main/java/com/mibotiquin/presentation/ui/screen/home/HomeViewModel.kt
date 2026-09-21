@@ -80,6 +80,18 @@ class HomeViewModel(
     private val _transferEvent = MutableStateFlow<String?>(null)
     val transferEvent: StateFlow<String?> = _transferEvent
 
+    // Toast messages para mostrar en la UI
+    private val _toastMessage = MutableStateFlow<String?>(null)
+    val toastMessage: StateFlow<String?> = _toastMessage
+
+    fun showToast(message: String) {
+        _toastMessage.value = message
+    }
+
+    fun clearToast() {
+        _toastMessage.value = null
+    }
+
     init {
         // Al arrancar (VM de scope Activity, una vez por sesión):
         // - con botiquines → restaura el activo persistido (o el primero)
@@ -284,9 +296,23 @@ class HomeViewModel(
 
     // ---- Categorías personalizadas ----
 
-    suspend fun addCustomCategory(name: String) = productRepository.addCustomCategory(name)
+    suspend fun addCustomCategory(name: String) {
+        try {
+            productRepository.addCustomCategory(name)
+        } catch (e: Exception) {
+            // Sin rethrow: muestra el error y evita crash de la app
+            showToast("Error al crear familia: ${e.message}")
+        }
+    }
 
-    suspend fun deleteCustomCategory(id: String) = productRepository.deleteCustomCategory(id)
+    suspend fun deleteCustomCategory(id: String) {
+        try {
+            productRepository.deleteCustomCategory(id)
+        } catch (e: Exception) {
+            // Sin rethrow: muestra el error y evita crash de la app
+            showToast("Error al eliminar familia: ${e.message}")
+        }
+    }
 
     // ---- Auto-update ----
 

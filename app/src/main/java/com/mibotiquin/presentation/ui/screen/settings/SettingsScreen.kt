@@ -3,6 +3,7 @@ package com.mibotiquin.presentation.ui.screen.settings
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -13,12 +14,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -43,6 +41,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,7 +70,16 @@ fun SettingsScreen(
     val activeCabinet by viewModel.activeCabinet.collectAsStateWithLifecycle()
     val cabinets by viewModel.cabinets.collectAsStateWithLifecycle()
     val useCamera by viewModel.useCamera.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    val ctx = LocalContext.current
+    val viewModelToast by viewModel.toastMessage.collectAsStateWithLifecycle()
+
+    // LaunchedEffect para mostrar toast cuando el ViewModel emite mensaje
+    LaunchedEffect(viewModelToast) {
+        viewModelToast?.let { msg ->
+            Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
+            viewModel.clearToast()
+        }
+    }
 
     // Launchers SAF (las acciones de backup/compartir viven aquí desde la migración)
     val exportBackupLauncher = rememberLauncherForActivityResult(
@@ -90,10 +98,10 @@ fun SettingsScreen(
     }
     val backupFolderLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
-    ) { uri -> uri?.let { saveBackupFolder(context, it) } }
+    ) { uri -> uri?.let { saveBackupFolder(ctx, it) } }
 
-    // Status bar height para notches / cutouts (patrón ScannerScreen)
-    val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    // Status bar height fijo (24dp estándar Android) en lugar de detección automática
+    val statusBarPadding = 24.dp
 
     MiBotiquinTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
@@ -420,6 +428,7 @@ private fun CategoryManagementSection(viewModel: HomeViewModel) {
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
+            shape = RoundedCornerShape(0.dp),
             title = { Text("Nueva familia") },
             text = {
                 OutlinedTextField(
@@ -437,9 +446,13 @@ private fun CategoryManagementSection(viewModel: HomeViewModel) {
                         if (newCategoryName.trim().isNotBlank()) {
                             val name = newCategoryName.trim()
                             viewModel.viewModelScope.launch {
-                                viewModel.addCustomCategory(name)
+                                try {
+                                    viewModel.addCustomCategory(name)
+                                    showAddDialog = false
+                                } catch (e: Exception) {
+                                    viewModel.showToast("Error al crear familia: ${e.message}")
+                                }
                             }
-                            showAddDialog = false
                         }
                     }
                 ) { Text("Crear") }
@@ -455,6 +468,7 @@ private fun CategoryManagementSection(viewModel: HomeViewModel) {
         categoryToDelete?.let { category ->
             AlertDialog(
                 onDismissRequest = { showDeleteConfirm = false; categoryToDelete = null },
+                shape = RoundedCornerShape(0.dp),
                 title = { Text("Eliminar familia") },
                 text = { Text("¿Eliminar la familia \"${category.displayName}\"? Los productos de esta familia pasarán a \"Medicamentos\".") },
                 confirmButton = {
@@ -462,10 +476,14 @@ private fun CategoryManagementSection(viewModel: HomeViewModel) {
                         onClick = {
                             val id = category.id
                             viewModel.viewModelScope.launch {
-                                viewModel.deleteCustomCategory(id)
+                                try {
+                                    viewModel.deleteCustomCategory(id)
+                                    showDeleteConfirm = false
+                                    categoryToDelete = null
+                                } catch (e: Exception) {
+                                    viewModel.showToast("Error al eliminar familia: ${e.message}")
+                                }
                             }
-                            showDeleteConfirm = false
-                            categoryToDelete = null
                         },
                         colors = ButtonDefaults.textButtonColors(
                             contentColor = MaterialTheme.colorScheme.error
