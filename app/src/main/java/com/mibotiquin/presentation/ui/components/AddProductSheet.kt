@@ -68,9 +68,13 @@ fun AddProductSheet(
     var name by rememberSaveable {
         mutableStateOf(existing?.product?.name ?: prefillName ?: "")
     }
-    var category by rememberSaveable {
-        mutableStateOf(existing?.product?.category ?: Category.Medicamentos)
+    // Categoría como String (serializable): CustomCategory es data class no-Serializable,
+    // guardar el objeto en rememberSaveable crashearía al serializar el estado
+    var categoryDisplayName by rememberSaveable {
+        mutableStateOf(existing?.product?.category?.displayName ?: Category.Medicamentos.displayName)
     }
+    val category = categories.firstOrNull { it.displayName == categoryDisplayName }
+        ?: Category.Medicamentos
     var quantity by rememberSaveable { mutableIntStateOf(existing?.product?.quantity ?: 1) }
 
     // Caducidad: mes/año. Prioridad: existente > DataMatrix > mismo mes del año siguiente
@@ -165,7 +169,7 @@ fun AddProductSheet(
                     categories.forEach { cat ->
                         FilterChip(
                             selected = category == cat,
-                            onClick = { category = cat },
+                            onClick = { categoryDisplayName = cat.displayName },
                             label = { Text(cat.displayName) }
                         )
                     }

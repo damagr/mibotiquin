@@ -11,11 +11,12 @@ sealed interface Category {
     }
 
     /** Creada por el usuario */
+    // java.io.Serializable: permite usarla en rememberSaveable sin crash al serializar
     data class CustomCategory(
         val id: String,
         override val displayName: String,
         override val order: Int
-    ) : Category
+    ) : Category, java.io.Serializable
 
     companion object {
         /** Lista base: solo Medicamentos predefinida */
