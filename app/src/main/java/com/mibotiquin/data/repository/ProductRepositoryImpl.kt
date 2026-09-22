@@ -102,10 +102,22 @@ class ProductRepositoryImpl(
 
     override suspend fun deleteCustomCategory(id: String) {
         val old = customCategoryDao.getByIdOnce(id)
-        // Los productos de la familia pasan a "Medicamentos" (vínculo por displayName)
-        // — sin esto quedarían como familias fantasma con el nombre antiguo
+        val now = System.currentTimeMillis()
         if (old != null) {
-            productDao.updateCategoryName(old.name, "Medicamentos", System.currentTimeMillis())
+            // Los productos de la familia pasan a "Medicamentos" (vínculo por displayName)
+            productDao.updateCategoryName(old.name, "Medicamentos", now)
+            // Tras el traslado, fusionar duplicados surgidos: mismo código+botiquín+caducidad
+            // (no pueden existir filas idénticas por diseño — guardar/editar ya suman)
+            val meds = productDao.getAllOnce().filter { it.category == "Medicamentos" }
+            val groups = meds.groupBy { Triple(it.barcode, it.cabinetId, it.expiryDate) }
+            for ((_, rows) in groups) {
+                if (rows.size > 1) {
+                    val total = rows.sumOf { it.quantity }
+                    val keeper = rows.minByOrNull { it.id } ?: continue  // conserva la más antigua
+                    productDao.update(keeper.copy(quantity = total, updatedAt = now))
+                    rows.filter { it.id != keeper.id }.forEach { productDao.deleteById(it.id) }
+                }
+            }
         }
         customCategoryDao.deleteById(id)
     }

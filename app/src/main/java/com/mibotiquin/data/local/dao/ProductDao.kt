@@ -42,6 +42,10 @@ interface ProductDao {
     @Query("SELECT * FROM products WHERE cabinetId = :cabinetId ORDER BY category ASC, name ASC")
     suspend fun getAllInCabinetOnce(cabinetId: String): List<ProductEntity>
 
+    /** Lectura one-shot global (todas las familias y botiquines) — para fusionar duplicados */
+    @Query("SELECT * FROM products")
+    suspend fun getAllOnce(): List<ProductEntity>
+
     @Query("SELECT * FROM products WHERE cabinetId = :cabinetId AND (name LIKE '%' || :query || '%' OR barcode LIKE '%' || :query || '%') ORDER BY category ASC, name ASC")
     fun searchInCabinet(query: String, cabinetId: String): Flow<List<ProductEntity>>
 
