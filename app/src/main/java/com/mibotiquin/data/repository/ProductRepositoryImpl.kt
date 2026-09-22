@@ -101,6 +101,12 @@ class ProductRepositoryImpl(
     }
 
     override suspend fun deleteCustomCategory(id: String) {
+        val old = customCategoryDao.getByIdOnce(id)
+        // Los productos de la familia pasan a "Medicamentos" (vínculo por displayName)
+        // — sin esto quedarían como familias fantasma con el nombre antiguo
+        if (old != null) {
+            productDao.updateCategoryName(old.name, "Medicamentos", System.currentTimeMillis())
+        }
         customCategoryDao.deleteById(id)
     }
 
@@ -124,23 +130,36 @@ class ProductRepositoryImpl(
         productDao.getByBarcodeOnce(barcode, cabinetId)?.toDomain()?.toUiModel()
 
     override suspend fun addProduct(product: Product): AddProductResult {
-        // Edición (id != 0): actualizar la entrada editada (sin deduplicación)
-        if (product.id != 0L) {
-            val id = productDao.insert(product.toEntity())
-            return AddProductResult(id, merged = false, newTotal = product.quantity)
-        }
-        // Nueva entrada: misma caja física (mismo código, botiquín, caducidad y familia)
-        // → sumar la cantidad indicada en vez de crear fila
         val same = productDao.findSameEntry(
             product.barcode, product.cabinetId, product.expiryDate, product.category.displayName
         )
-        if (same != null) {
+
+        if (product.id == 0L) {
+            // Nueva entrada: misma caja física (mismo código, botiquín, caducidad y familia)
+            // → sumar la cantidad indicada en vez de crear fila
+            if (same != null) {
+                val total = same.quantity + product.quantity
+                productDao.update(
+                    same.copy(quantity = total, updatedAt = System.currentTimeMillis())
+                )
+                return AddProductResult(same.id, merged = true, newTotal = total)
+            }
+            val id = productDao.insert(product.toEntity())
+            return AddProductResult(id, merged = false, newTotal = product.quantity)
+        }
+
+        // Edición (mover de familia/fecha):
+        if (same != null && same.id != product.id) {
+            // El resultado coincide con OTRA entrada existente → fusionar: sumar en la
+            // existente y borrar la editada (no quedan dos filas idénticas)
             val total = same.quantity + product.quantity
             productDao.update(
                 same.copy(quantity = total, updatedAt = System.currentTimeMillis())
             )
+            productDao.deleteById(product.id)
             return AddProductResult(same.id, merged = true, newTotal = total)
         }
+        // Sin coincidencia (o es la misma entrada: solo cambió cantidad) → actualizar normal
         val id = productDao.insert(product.toEntity())
         return AddProductResult(id, merged = false, newTotal = product.quantity)
     }
