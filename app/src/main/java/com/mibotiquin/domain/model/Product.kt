@@ -51,3 +51,10 @@ data class ProductUiModel(
             else -> "en $monthsUntilExpiry meses"
         }
 }
+
+/** Resultado de guardar un producto: indica si se sumó cantidad a una entrada existente */
+data class AddProductResult(
+    val id: Long,
+    val merged: Boolean,   // true = misma caja física (mismo código+botiquín+caducidad+familia) → cantidad sumada
+    val newTotal: Int      // cantidad total de la entrada tras guardar
+)

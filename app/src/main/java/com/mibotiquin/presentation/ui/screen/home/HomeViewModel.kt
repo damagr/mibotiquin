@@ -136,10 +136,6 @@ class HomeViewModel(
     private val _editingProduct = MutableStateFlow<ProductUiModel?>(null)
     val editingProduct: StateFlow<ProductUiModel?> = _editingProduct
 
-    // Producto existente para el CN escaneado (lookup previo antes de abrir el sheet)
-    private val _existingForBarcode = MutableStateFlow<ProductUiModel?>(null)
-    val existingForBarcode: StateFlow<ProductUiModel?> = _existingForBarcode
-
     fun openEditProduct(product: ProductUiModel) {
         _editingProduct.value = product
         _showProductSheet.value = true
@@ -148,7 +144,6 @@ class HomeViewModel(
     fun closeProductSheet() {
         _showProductSheet.value = false
         _editingProduct.value = null
-        _existingForBarcode.value = null
     }
 
     // ---- Búsqueda ----
@@ -186,9 +181,9 @@ class HomeViewModel(
     ) {
         val cabinet = _activeCabinet.value ?: return
         viewModelScope.launch {
-            val existing = _existingForBarcode.value?.product ?: _editingProduct.value?.product
+            val existing = _editingProduct.value?.product
             try {
-                addProductUseCase(
+                val result = addProductUseCase(
                     Product(
                         id = existing?.id ?: 0,
                         barcode = barcode, name = name, category = category,
@@ -198,6 +193,10 @@ class HomeViewModel(
                         updatedAt = System.currentTimeMillis()
                     )
                 )
+                if (result.merged) {
+                    _transferEvent.value =
+                        "Ya tenías este producto: +$quantity → total ${result.newTotal}"
+                }
             } catch (e: Exception) {
                 _transferEvent.value = "Error al guardar el producto"
             }
@@ -208,11 +207,9 @@ class HomeViewModel(
     // ---- Búsqueda por código de barras (re-escaneo) ----
 
     fun lookupBarcode(barcode: String) {
-        val cabinet = _activeCabinet.value ?: return
-        viewModelScope.launch {
-            _existingForBarcode.value = getProductByBarcodeUseCase(cabinet.id, barcode)
-            _showProductSheet.value = true
-        }
+        // Re-escaneo: siempre modo nuevo — la deduplicación al guardar decide
+        // (suma si misma caja física, nueva entrada si distinta fecha/familia)
+        _showProductSheet.value = true
     }
 
     // ---- Botiquín CRUD ----

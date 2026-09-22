@@ -17,7 +17,7 @@ import com.mibotiquin.data.local.entity.ProductEntity
 
 @Database(
     entities = [ProductEntity::class, CabinetEntity::class, CustomCategoryEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -92,6 +92,15 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // v4: el índice (barcode, cabinetId) deja de ser único — múltiples cajas del
+        // mismo medicamento con distintas fechas/familias; deduplicación a nivel de repo
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP INDEX IF EXISTS index_products_barcode_cabinetId")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_products_barcode_cabinetId ON products (barcode, cabinetId)")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -99,7 +108,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "mibotiquin.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .fallbackToDestructiveMigration(false)
                     .build()
                     .also { INSTANCE = it }

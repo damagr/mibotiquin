@@ -29,6 +29,10 @@ interface ProductDao {
     @Query("SELECT * FROM products WHERE barcode = :barcode AND cabinetId = :cabinetId")
     suspend fun getByBarcodeOnce(barcode: String, cabinetId: String): ProductEntity?
 
+    /** Misma caja física: mismo código, botiquín, caducidad y familia → para sumar cantidad */
+    @Query("SELECT * FROM products WHERE barcode = :barcode AND cabinetId = :cabinetId AND expiryDate = :expiryDate AND category = :category LIMIT 1")
+    suspend fun findSameEntry(barcode: String, cabinetId: String, expiryDate: Long, category: String): ProductEntity?
+
     @Query("SELECT * FROM products WHERE cabinetId = :cabinetId ORDER BY category ASC, name ASC")
     fun getAllInCabinet(cabinetId: String): Flow<List<ProductEntity>>
 

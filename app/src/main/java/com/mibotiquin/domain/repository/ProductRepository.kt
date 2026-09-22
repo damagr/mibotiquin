@@ -3,6 +3,7 @@ package com.mibotiquin.domain.repository
 import com.mibotiquin.domain.model.Category
 import com.mibotiquin.domain.model.Cabinet
 import com.mibotiquin.domain.model.Product
+import com.mibotiquin.domain.model.AddProductResult
 import com.mibotiquin.domain.model.ProductUiModel
 import kotlinx.coroutines.flow.Flow
 
@@ -28,7 +29,7 @@ interface ProductRepository {
     fun searchProducts(cabinetId: String, query: String): Flow<List<ProductUiModel>>
     suspend fun getProductById(id: Long): ProductUiModel?
     suspend fun getProductByBarcode(cabinetId: String, barcode: String): ProductUiModel?
-    suspend fun addProduct(product: Product): Long
+    suspend fun addProduct(product: Product): AddProductResult
     suspend fun updateQuantity(id: Long, quantity: Int): Int
     suspend fun updateExpiryDate(id: Long, expiryDate: Long): Int
     suspend fun deleteProduct(id: Long): Int

@@ -2,6 +2,7 @@ package com.mibotiquin.domain.usecase
 
 import com.mibotiquin.domain.model.Cabinet
 import com.mibotiquin.domain.model.Product
+import com.mibotiquin.domain.model.AddProductResult
 import com.mibotiquin.domain.model.ProductUiModel
 import com.mibotiquin.domain.repository.ProductRepository
 import kotlinx.coroutines.flow.Flow
@@ -50,7 +51,7 @@ class GetProductByBarcodeUseCase(private val repository: ProductRepository) {
 }
 
 class AddProductUseCase(private val repository: ProductRepository) {
-    suspend operator fun invoke(product: Product): Long = repository.addProduct(product)
+    suspend operator fun invoke(product: Product): AddProductResult = repository.addProduct(product)
 }
 
 class UpdateProductQuantityUseCase(private val repository: ProductRepository) {

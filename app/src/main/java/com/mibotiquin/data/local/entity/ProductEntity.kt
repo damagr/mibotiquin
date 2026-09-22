@@ -6,7 +6,9 @@ import androidx.room.PrimaryKey
 @Entity(
     tableName = "products",
     indices = [
-        Index(value = ["barcode", "cabinetId"], unique = true),
+        // Sin unique: múltiples cajas del mismo medicamento (distintas fechas/familias);
+        // la deduplicación (mismo barcode+botiquín+caducidad+familia → sumar) es a nivel de repo
+        Index(value = ["barcode", "cabinetId"]),
         Index(value = ["name"]),
         Index(value = ["category"]),
         Index(value = ["expiryDate"]),

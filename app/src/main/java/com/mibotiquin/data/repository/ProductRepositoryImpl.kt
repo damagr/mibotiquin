@@ -9,6 +9,7 @@ import com.mibotiquin.data.local.mapper.toEntity
 import com.mibotiquin.domain.model.Category
 import com.mibotiquin.domain.model.Cabinet
 import com.mibotiquin.domain.model.Product
+import com.mibotiquin.domain.model.AddProductResult
 import com.mibotiquin.domain.model.ProductUiModel
 import com.mibotiquin.domain.repository.ProductRepository
 import kotlinx.coroutines.flow.Flow
@@ -104,8 +105,27 @@ class ProductRepositoryImpl(
     override suspend fun getProductByBarcode(cabinetId: String, barcode: String): ProductUiModel? =
         productDao.getByBarcodeOnce(barcode, cabinetId)?.toDomain()?.toUiModel()
 
-    override suspend fun addProduct(product: Product): Long =
-        productDao.insert(product.toEntity())
+    override suspend fun addProduct(product: Product): AddProductResult {
+        // Edición (id != 0): actualizar la entrada editada (sin deduplicación)
+        if (product.id != 0L) {
+            val id = productDao.insert(product.toEntity())
+            return AddProductResult(id, merged = false, newTotal = product.quantity)
+        }
+        // Nueva entrada: misma caja física (mismo código, botiquín, caducidad y familia)
+        // → sumar la cantidad indicada en vez de crear fila
+        val same = productDao.findSameEntry(
+            product.barcode, product.cabinetId, product.expiryDate, product.category.displayName
+        )
+        if (same != null) {
+            val total = same.quantity + product.quantity
+            productDao.update(
+                same.copy(quantity = total, updatedAt = System.currentTimeMillis())
+            )
+            return AddProductResult(same.id, merged = true, newTotal = total)
+        }
+        val id = productDao.insert(product.toEntity())
+        return AddProductResult(id, merged = false, newTotal = product.quantity)
+    }
 
     override suspend fun updateQuantity(id: Long, quantity: Int): Int =
         productDao.getByIdOnce(id)?.let { entity ->

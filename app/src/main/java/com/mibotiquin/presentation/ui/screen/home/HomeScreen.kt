@@ -191,38 +191,55 @@ fun HomeScreen(
         }
     }
 
-    // CN escaneado → buscar en la DB local: si existe, editar; si no, sheet con prefills
+    // CN escaneado → siempre sheet en modo NUEVO con prefills:
+    // la deduplicación al guardar decide (suma si misma caja física, nueva entrada si distinta fecha/familia)
     scannedCn?.let { barcode ->
-        val existing by viewModel.existingForBarcode.collectAsStateWithLifecycle()
-
         LaunchedEffect(barcode) {
             viewModel.lookupBarcode(barcode)
         }
 
-        if (showProductSheet) {
-            val isNewProduct = existing == null
+        if (showProductSheet && editingProduct == null) {
             AddProductSheet(
                 barcode = barcode,
-                existing = if (isNewProduct) null else existing,
-                prefillName = if (isNewProduct) scannedName else null,
-                prefillExpiryYearMonth = if (isNewProduct) scannedExpiry else null,
-                prefillCn = if (isNewProduct) barcode else null,
-                prefillCimaName = if (isNewProduct) scannedName else null,
+                existing = null,
+                prefillName = scannedName,
+                prefillExpiryYearMonth = scannedExpiry,
+                prefillCn = barcode,
+                prefillCimaName = scannedName,
                 categories = viewModel.allCategories.value,
                 onSave = { code, name, category, quantity, expiry ->
                     viewModel.addProduct(code, name, category, quantity, expiry)
                     onScanConsumed()
                 },
-                onDelete = if (isNewProduct) null else {
-                    {
-                        viewModel.onDeleteProduct(existing!!)
-                        viewModel.closeProductSheet()
-                        onScanConsumed()
-                    }
-                },
+                onDelete = null,
                 onDismiss = {
                     viewModel.closeProductSheet()
                     onScanConsumed()
+                }
+            )
+        }
+    }
+
+    // Editar producto desde la tarjeta de la lista (sin escaneo previo)
+    editingProduct?.let { product ->
+        if (showProductSheet) {
+            AddProductSheet(
+                barcode = product.product.barcode,
+                existing = product,
+                prefillName = null,
+                prefillExpiryYearMonth = null,
+                prefillCn = null,
+                prefillCimaName = null,
+                categories = viewModel.allCategories.value,
+                onSave = { code, name, category, quantity, expiry ->
+                    viewModel.addProduct(code, name, category, quantity, expiry)
+                },
+                onDelete = {
+                    viewModel.onDeleteProduct(product)
+                    viewModel.closeProductSheet()
+                },
+                onDismiss = {
+                    viewModel.closeProductSheet()
                 }
             )
         }
