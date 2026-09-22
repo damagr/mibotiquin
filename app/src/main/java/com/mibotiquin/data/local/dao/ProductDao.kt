@@ -56,4 +56,8 @@ interface ProductDao {
 
     @Query("SELECT MAX(updatedAt) FROM products WHERE cabinetId = :cabinetId")
     suspend fun getCabinetLastUpdate(cabinetId: String): Long?
+
+    /** Renombrar familia: actualiza el displayName en los productos que lo referencian */
+    @Query("UPDATE products SET category = :newName, updatedAt = :now WHERE category = :oldName")
+    suspend fun updateCategoryName(oldName: String, newName: String, now: Long)
 }

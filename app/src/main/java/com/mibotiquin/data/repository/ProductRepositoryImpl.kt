@@ -73,6 +73,24 @@ class ProductRepositoryImpl(
         return entity.toDomain()
     }
 
+    override suspend fun renameCustomCategory(id: String, newName: String): Category.CustomCategory {
+        val old = customCategoryDao.getByIdOnce(id)
+            ?: throw IllegalStateException("Familia no encontrada")
+        val newNameTrimmed = newName.trim()
+        val entity = com.mibotiquin.data.local.entity.CustomCategoryEntity(
+            id = id,
+            name = newNameTrimmed,
+            order = old.order
+        )
+        customCategoryDao.insert(entity) // REPLACE (mismo id)
+        // El vínculo producto↔familia es por displayName: actualizar los productos que
+        // referencian el nombre anterior para no dejar familias fantasma
+        if (old.name != newNameTrimmed) {
+            productDao.updateCategoryName(old.name, newNameTrimmed, System.currentTimeMillis())
+        }
+        return entity.toDomain()
+    }
+
     override suspend fun updateCustomCategory(category: Category.CustomCategory) {
         val entity = com.mibotiquin.data.local.entity.CustomCategoryEntity(
             id = category.id,

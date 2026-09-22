@@ -15,6 +15,9 @@ interface CustomCategoryDao {
     @Query("SELECT * FROM custom_categories WHERE id = :id")
     fun getById(id: String): Flow<CustomCategoryEntity?>
 
+    @Query("SELECT * FROM custom_categories WHERE id = :id")
+    suspend fun getByIdOnce(id: String): CustomCategoryEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(category: CustomCategoryEntity)
 

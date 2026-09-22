@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -376,6 +377,9 @@ private fun CategoryManagementSection(viewModel: HomeViewModel) {
     var showAddDialog by remember { mutableStateOf(false) }
     var categoryToDelete by remember { mutableStateOf<Category.CustomCategory?>(null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var categoryToRename by remember { mutableStateOf<Category.CustomCategory?>(null) }
+    var renameValue by remember { mutableStateOf("") }
+    var showRenameDialog by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (customCategories.isEmpty()) {
@@ -397,17 +401,32 @@ private fun CategoryManagementSection(viewModel: HomeViewModel) {
                         text = category.displayName,
                         style = MaterialTheme.typography.bodyLarge
                     )
-                    IconButton(
-                        onClick = {
-                            categoryToDelete = category
-                            showDeleteConfirm = true
+                    Row {
+                        IconButton(
+                            onClick = {
+                                categoryToRename = category
+                                renameValue = category.displayName
+                                showRenameDialog = true
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Edit,
+                                contentDescription = "Renombrar familia",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
                         }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.DeleteOutline,
-                            contentDescription = "Eliminar familia",
-                            tint = MaterialTheme.colorScheme.error
-                        )
+                        IconButton(
+                            onClick = {
+                                categoryToDelete = category
+                                showDeleteConfirm = true
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.DeleteOutline,
+                                contentDescription = "Eliminar familia",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
                     }
                 }
             }
@@ -492,6 +511,49 @@ private fun CategoryManagementSection(viewModel: HomeViewModel) {
                 },
                 dismissButton = {
                     TextButton(onClick = { showDeleteConfirm = false; categoryToDelete = null }) { Text("Cancelar") }
+                }
+            )
+        }
+    }
+
+    // Diálogo renombrar familia
+    if (showRenameDialog) {
+        categoryToRename?.let { category ->
+            AlertDialog(
+                onDismissRequest = { showRenameDialog = false; categoryToRename = null },
+                shape = RoundedCornerShape(0.dp),
+                title = { Text("Renombrar familia") },
+                text = {
+                    OutlinedTextField(
+                        value = renameValue,
+                        onValueChange = { renameValue = it },
+                        label = { Text("Nuevo nombre") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            val id = category.id
+                            val name = renameValue.trim()
+                            if (name.isNotBlank()) {
+                                viewModel.viewModelScope.launch {
+                                    try {
+                                        viewModel.renameCustomCategory(id, name)
+                                        showRenameDialog = false
+                                        categoryToRename = null
+                                    } catch (e: Exception) {
+                                        viewModel.showToast("Error al renombrar familia: ${e.message}")
+                                    }
+                                }
+                            }
+                        }
+                    ) { Text("Renombrar") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showRenameDialog = false; categoryToRename = null }) { Text("Cancelar") }
                 }
             )
         }

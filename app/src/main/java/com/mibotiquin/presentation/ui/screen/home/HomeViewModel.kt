@@ -302,6 +302,15 @@ class HomeViewModel(
         }
     }
 
+    suspend fun renameCustomCategory(id: String, newName: String) {
+        try {
+            productRepository.renameCustomCategory(id, newName)
+        } catch (e: Exception) {
+            // Sin rethrow: muestra el error y evita crash de la app
+            showToast("Error al renombrar familia: ${e.message}")
+        }
+    }
+
     suspend fun deleteCustomCategory(id: String) {
         try {
             productRepository.deleteCustomCategory(id)

@@ -20,6 +20,7 @@ interface ProductRepository {
     // ---- Categorías ----
     fun getAllCategories(): Flow<List<Category>>
     suspend fun addCustomCategory(name: String): Category.CustomCategory
+    suspend fun renameCustomCategory(id: String, newName: String): Category.CustomCategory
     suspend fun updateCustomCategory(category: Category.CustomCategory)
     suspend fun deleteCustomCategory(id: String)
 
