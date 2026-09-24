@@ -200,7 +200,7 @@ fun AddProductSheet(
                             quickFamilyName = ""
                             showQuickFamilyDialog = true
                         },
-                        label = { Text("+ Nueva") },
+                        label = { Text("Nueva") },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Filled.Add,
