@@ -13,7 +13,8 @@ fun ProductEntity.toDomain(): Product = Product(
     expiryDate = expiryDate,
     cabinetId = cabinetId,
     createdAt = createdAt,
-    updatedAt = updatedAt
+    updatedAt = updatedAt,
+    isNonPerishable = isNonPerishable
 )
 
 fun Product.toEntity(): ProductEntity = ProductEntity(
@@ -25,7 +26,8 @@ fun Product.toEntity(): ProductEntity = ProductEntity(
     expiryDate = expiryDate,
     cabinetId = cabinetId,
     createdAt = createdAt,
-    updatedAt = updatedAt
+    updatedAt = updatedAt,
+    isNonPerishable = isNonPerishable
 )
 
 private fun parseCategory(categoryName: String): Category = when (categoryName) {

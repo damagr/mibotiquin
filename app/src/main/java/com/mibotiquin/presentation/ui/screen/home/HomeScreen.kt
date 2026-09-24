@@ -193,6 +193,7 @@ fun HomeScreen(
 
     // CN escaneado → siempre sheet en modo NUEVO con prefills:
     // la deduplicación al guardar decide (suma si misma caja física, nueva entrada si distinta fecha/familia)
+    val allCategories by viewModel.allCategories.collectAsStateWithLifecycle()
     scannedCn?.let { barcode ->
         LaunchedEffect(barcode) {
             viewModel.lookupBarcode(barcode)
@@ -206,11 +207,12 @@ fun HomeScreen(
                 prefillExpiryYearMonth = scannedExpiry,
                 prefillCn = barcode,
                 prefillCimaName = scannedName,
-                categories = viewModel.allCategories.value,
-                onSave = { code, name, category, quantity, expiry ->
-                    viewModel.addProduct(code, name, category, quantity, expiry)
+                categories = allCategories,
+                onSave = { code, name, category, quantity, expiry, isNonPerishable ->
+                    viewModel.addProduct(code, name, category, quantity, expiry, isNonPerishable)
                     onScanConsumed()
                 },
+                onAddFamily = viewModel::addCustomCategoryQuick,
                 onDelete = null,
                 onDismiss = {
                     viewModel.closeProductSheet()
@@ -230,10 +232,11 @@ fun HomeScreen(
                 prefillExpiryYearMonth = null,
                 prefillCn = null,
                 prefillCimaName = null,
-                categories = viewModel.allCategories.value,
-                onSave = { code, name, category, quantity, expiry ->
-                    viewModel.addProduct(code, name, category, quantity, expiry)
+                categories = allCategories,
+                onSave = { code, name, category, quantity, expiry, isNonPerishable ->
+                    viewModel.addProduct(code, name, category, quantity, expiry, isNonPerishable)
                 },
+                onAddFamily = viewModel::addCustomCategoryQuick,
                 onDelete = {
                     viewModel.onDeleteProduct(product)
                     viewModel.closeProductSheet()

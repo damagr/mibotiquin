@@ -158,12 +158,27 @@ fun ScannerScreen(
                     } else {
                         showManualExpiryPicker = true
                     }
-                }
+                },
+                manualItemButtonText = if (step == ScanStep.ReadCn) {
+                    "Introducir medicamento a mano"
+                } else {
+                    null
+                },
+                onManualItem = { onScanComplete("", null, null) }
             )
         }
 
         // Contenido por etapa (exclusivo: nunca se solapa con la cámara)
         when (step) {
+            ScanStep.ChooseInput -> {
+                // Sin cámara: pantalla de elección (como la cámara tiene su estado inicial)
+                ChooseInputScreen(
+                    onEnterCn = viewModel::onManualCnRequested,
+                    onManualItem = { onScanComplete("", null, null) },
+                    onCancel = onBack
+                )
+            }
+
             ScanStep.ReadCn -> {
                 if (!viewModel.useCamera) {
                     ManualCnScreen(
@@ -328,7 +343,9 @@ private fun ScannerControls(
     onTorchToggle: () -> Unit,
     onBack: () -> Unit,
     bottomButtonText: String,
-    onBottomButton: () -> Unit
+    onBottomButton: () -> Unit,
+    manualItemButtonText: String? = null,  // solo en ReadCn: artículo sin código
+    onManualItem: () -> Unit = {}
 ) {
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     Box(modifier = Modifier.fillMaxSize()) {
@@ -364,8 +381,17 @@ private fun ScannerControls(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(24.dp)
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            if (manualItemButtonText != null) {
+                Button(
+                    onClick = onManualItem,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(manualItemButtonText)
+                }
+            }
             Button(
                 onClick = onBottomButton,
                 modifier = Modifier.fillMaxWidth()
@@ -387,6 +413,60 @@ private fun LoadingScreen() {
         Text(
             text = "Consultando CIMA…",
             style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(top = 16.dp)
+        )
+    }
+}
+
+@Composable
+private fun ChooseInputScreen(
+    onEnterCn: () -> Unit,
+    onManualItem: () -> Unit,
+    onCancel: () -> Unit
+) {
+    val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(top = statusBarPadding + 24.dp, start = 24.dp, end = 24.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        IconButton(onClick = onCancel, modifier = Modifier.align(Alignment.Start)) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Volver",
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+        Text(
+            text = "Añadir producto",
+            style = MaterialTheme.typography.headlineSmall
+        )
+        Text(
+            text = "¿Cómo quieres introducirlo?",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(vertical = 16.dp)
+        )
+        Button(
+            onClick = onEnterCn,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+        ) { Text("Introducir CN") }
+        Button(
+            onClick = onManualItem,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+        ) { Text("Introducir medicamento a mano") }
+        Text(
+            text = "\"Medicamento a mano\": para artículos sin código de barras ni CN (vendas, cinta, etc.)",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 16.dp)
         )
     }

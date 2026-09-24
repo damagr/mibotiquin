@@ -177,7 +177,8 @@ class HomeViewModel(
     }
 
     fun addProduct(
-        barcode: String, name: String, category: Category, quantity: Int, expiryDate: Long
+        barcode: String, name: String, category: Category, quantity: Int, expiryDate: Long,
+        isNonPerishable: Boolean = false
     ) {
         val cabinet = _activeCabinet.value ?: return
         viewModelScope.launch {
@@ -190,7 +191,8 @@ class HomeViewModel(
                         quantity = quantity, expiryDate = expiryDate,
                         cabinetId = cabinet.id,
                         createdAt = existing?.createdAt ?: System.currentTimeMillis(),
-                        updatedAt = System.currentTimeMillis()
+                        updatedAt = System.currentTimeMillis(),
+                        isNonPerishable = isNonPerishable
                     )
                 )
                 if (result.merged) {
@@ -300,6 +302,11 @@ class HomeViewModel(
             // Sin rethrow: muestra el error y evita crash de la app
             showToast("Error al crear familia: ${e.message}")
         }
+    }
+
+    /** Crear familia rápida desde el sheet de producto (callback no-suspend) */
+    fun addCustomCategoryQuick(name: String) {
+        viewModelScope.launch { addCustomCategory(name) }
     }
 
     suspend fun renameCustomCategory(id: String, newName: String) {

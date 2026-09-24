@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 enum class ScanStep {
+    ChooseInput,       // sin cámara: elegir introducir CN o artículo manual
     ReadCn,            // cámara para EAN-13 / DataMatrix GTIN→CN
     ManualCn,          // teclado numérico 6 dígitos
     ConsultingCima,    // spinner consultando CIMA
@@ -28,7 +29,7 @@ class ScannerViewModel(
 ) : ViewModel() {
 
     private val _step = MutableStateFlow(
-        if (preferences.useCamera) ScanStep.ReadCn else ScanStep.ManualCn
+        if (preferences.useCamera) ScanStep.ReadCn else ScanStep.ChooseInput
     )
     val step: StateFlow<ScanStep> = _step.asStateFlow()
 
@@ -52,9 +53,9 @@ class ScannerViewModel(
     val useCamera: Boolean
         get() = preferences.useCamera
 
-    /** Volver al escaneo de CN, desde cualquier etapa intermedia */
+    /** Volver al escaneo de CN o a la elección inicial (según cámara), desde cualquier etapa intermedia */
     fun onRescan() {
-        _step.value = if (useCamera) ScanStep.ReadCn else ScanStep.ManualCn
+        _step.value = if (useCamera) ScanStep.ReadCn else ScanStep.ChooseInput
     }
 
     /** Entrar en CN manual */

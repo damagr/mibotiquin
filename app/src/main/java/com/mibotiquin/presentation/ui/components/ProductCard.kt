@@ -101,6 +101,7 @@ fun ProductCard(
                         status = product.expiryStatus,
                         monthsText = product.formattedMonthsUntilExpiry,
                         expiryMonth = product.formattedExpiryMonth,
+                        isNonPerishable = product.product.isNonPerishable,
                         colors = expiryColors
                     )
                 }
@@ -114,13 +115,14 @@ private fun ExpiryChip(
     status: ExpiryStatus,
     monthsText: String,
     expiryMonth: String,
+    isNonPerishable: Boolean,
     colors: com.mibotiquin.presentation.ui.theme.ExpiryColorSet
 ) {
     val themeColors = MaterialTheme.colorScheme
 
     if (status == ExpiryStatus.OK) {
         Text(
-            text = "Caduca $expiryMonth",
+            text = if (isNonPerishable) "No perecedero" else "Caduca $expiryMonth",
             style = MaterialTheme.typography.bodyMedium,
             color = themeColors.onSurfaceVariant
         )

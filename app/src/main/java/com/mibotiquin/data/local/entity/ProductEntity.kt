@@ -21,8 +21,9 @@ data class ProductEntity(
     val name: String,
     val category: String,  // displayName de la categoría (Medicamentos, custom, etc.)
     val quantity: Int,
-    val expiryDate: Long,          // epoch millis UTC
+    val expiryDate: Long,          // epoch millis UTC (0 = no perecedero)
     val cabinetId: String,         // FK lógica hacia cabinets
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    val isNonPerishable: Boolean = false  // sin caducidad (vendas, cinta, etc.)
 )

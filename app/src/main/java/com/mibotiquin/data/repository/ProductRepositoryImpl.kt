@@ -142,12 +142,21 @@ class ProductRepositoryImpl(
         productDao.getByBarcodeOnce(barcode, cabinetId)?.toDomain()?.toUiModel()
 
     override suspend fun addProduct(product: Product): AddProductResult {
-        val same = productDao.findSameEntry(
-            product.barcode, product.cabinetId, product.expiryDate, product.category.displayName
-        )
+        // Artículos sin código (vendas, cinta, etc.): deduplicación por nombre
+        val same = if (product.barcode.isBlank()) {
+            productDao.findSameEntryByName(
+                product.name, product.cabinetId, product.expiryDate,
+                product.category.displayName, product.isNonPerishable
+            )
+        } else {
+            productDao.findSameEntry(
+                product.barcode, product.cabinetId, product.expiryDate,
+                product.category.displayName, product.isNonPerishable
+            )
+        }
 
         if (product.id == 0L) {
-            // Nueva entrada: misma caja física (mismo código, botiquín, caducidad y familia)
+            // Nueva entrada: mismo artículo físico (código/nombre + botiquín + caducidad + familia)
             // → sumar la cantidad indicada en vez de crear fila
             if (same != null) {
                 val total = same.quantity + product.quantity

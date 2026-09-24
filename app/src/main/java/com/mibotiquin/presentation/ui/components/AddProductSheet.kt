@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
@@ -22,6 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -35,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -59,7 +63,8 @@ fun AddProductSheet(
     prefillCn: String? = null,              // CN 6 dígitos para link prospecto CIMA
     prefillCimaName: String? = null,        // nombre CIMA confirmado (solo si existe en CIMA)
     categories: List<Category>,             // lista de categorías disponibles (Medicamentos + custom)
-    onSave: (barcode: String, name: String, category: Category, quantity: Int, expiryDate: Long) -> Unit,
+    onSave: (barcode: String, name: String, category: Category, quantity: Int, expiryDate: Long, isNonPerishable: Boolean) -> Unit,
+    onAddFamily: (String) -> Unit = {},     // crear familia rápida sin salir del sheet
     onDelete: (() -> Unit)? = null,   // solo en edición
     onDismiss: () -> Unit
 ) {
@@ -86,6 +91,13 @@ fun AddProductSheet(
     var expiryMonth by rememberSaveable { mutableStateOf(defaultExpiryMonth.toString()) }
     var showMonthPicker by rememberSaveable { mutableStateOf(false) }
     var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
+    // No perecedero: sin caducidad (vendas, cinta, etc.). Prioridad: existente > false
+    var isNonPerishable by rememberSaveable {
+        mutableStateOf(existing?.product?.isNonPerishable ?: false)
+    }
+    // Familia rápida: diálogo para crear sin salir del sheet
+    var showQuickFamilyDialog by rememberSaveable { mutableStateOf(false) }
+    var quickFamilyName by rememberSaveable { mutableStateOf("") }
 
     // Launcher para abrir prospecto CIMA en navegador
     val openProspectoLauncher = rememberLauncherForActivityResult(
@@ -125,11 +137,19 @@ fun AddProductSheet(
                         }
                     }
                 }
-                Text(
-                    text = "Código: $barcode",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (barcode.isBlank()) {
+                    Text(
+                        text = "Sin código de barras",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Text(
+                        text = "Código: $barcode",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 // Chip "Prospecto" si tenemos CN confirmado + nombre CIMA
                 if (prefillCn != null && prefillCimaName != null) {
                     FilterChip(
@@ -160,7 +180,7 @@ fun AddProductSheet(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // Categorías: FlowRow (los chips se envuelven, no se amontonan)
+                // Categorías: FlowRow (los chips se envuelven, no se amontonan) + atajo crear familia
                 Text("Categoría", style = MaterialTheme.typography.titleSmall)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -173,6 +193,22 @@ fun AddProductSheet(
                             label = { Text(cat.displayName) }
                         )
                     }
+                    // Atajo: crear familia sin salir del sheet
+                    FilterChip(
+                        selected = false,
+                        onClick = {
+                            quickFamilyName = ""
+                            showQuickFamilyDialog = true
+                        },
+                        label = { Text("+ Nueva") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Filled.Add,
+                                contentDescription = "Crear familia rápida",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    )
                 }
 
                 // Cantidad
@@ -193,12 +229,27 @@ fun AddProductSheet(
                     OutlinedButton(onClick = { quantity++ }) { Text("+") }
                 }
 
-                // Caducidad MM/AAAA
-                OutlinedButton(
-                    onClick = { showMonthPicker = true },
-                    modifier = Modifier.fillMaxWidth()
+                // No perecedero: sin caducidad (vendas, cinta, etc.)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Caducidad: ${parsedExpiryMonth.monthValue.toString().padStart(2, '0')}/${parsedExpiryMonth.year}")
+                    Text("No perecedero", style = MaterialTheme.typography.titleSmall)
+                    Switch(
+                        checked = isNonPerishable,
+                        onCheckedChange = { isNonPerishable = it }
+                    )
+                }
+
+                // Caducidad MM/AAAA (oculta si no perecedero)
+                if (!isNonPerishable) {
+                    OutlinedButton(
+                        onClick = { showMonthPicker = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Caducidad: ${parsedExpiryMonth.monthValue.toString().padStart(2, '0')}/${parsedExpiryMonth.year}")
+                    }
                 }
             }
         },
@@ -211,8 +262,11 @@ fun AddProductSheet(
                             name.trim(),
                             category,
                             quantity,
-                            parsedExpiryMonth.atDay(1)
-                                .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                            // No perecedero: expiryDate 0 (sin significado; display por isNonPerishable)
+                            if (isNonPerishable) 0L
+                            else parsedExpiryMonth.atDay(1)
+                                .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+                            isNonPerishable
                         )
                     },
                     enabled = name.isNotBlank()
@@ -258,6 +312,41 @@ fun AddProductSheet(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancelar") }
+            }
+        )
+    }
+
+    // Diálogo familia rápida (crear sin salir del sheet)
+    if (showQuickFamilyDialog) {
+        AlertDialog(
+            onDismissRequest = { showQuickFamilyDialog = false },
+            shape = RectangleShape,
+            title = { Text("Nueva familia") },
+            text = {
+                OutlinedTextField(
+                    value = quickFamilyName,
+                    onValueChange = { quickFamilyName = it },
+                    label = { Text("Nombre de la familia") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val name = quickFamilyName.trim()
+                        if (name.isNotBlank()) {
+                            // Crear + auto-seleccionar (el chip aparece al actualizarse la lista)
+                            onAddFamily(name)
+                            categoryDisplayName = name
+                            showQuickFamilyDialog = false
+                        }
+                    }
+                ) { Text("Crear") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showQuickFamilyDialog = false }) { Text("Cancelar") }
             }
         )
     }
