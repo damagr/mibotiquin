@@ -2,81 +2,57 @@
 
 > **Inventario de confianza** para tu botiquín doméstico. Se abre en momentos de necesidad y te da calma, orden y rapidez absoluta.
 
-## ✨ Características
+## ¿Qué hace?
 
-| Función | Detalle |
-|---------|---------|
-| **Búsqueda instantánea** | Campo activo al abrir; filtra nombre/código/categoría en tiempo real |
-| **Familias personalizadas** | Familia predefinida "Medicamentos" + las que tú crees: crear, renombrar y eliminar desde Ajustes, o al instante desde el formulario (+ Nueva) |
-| **Artículos sin código** | Vendas, cinta y otros sin código de barras ni CN: escríbelos a mano (nombre + familia + caducidad si procede) |
-| **No perecedero** | Toggle para artículos que no caducan — la tarjeta muestra "No perecedero" en vez de fecha |
-| **Escáner real** | CameraX + ML Kit (EAN-13, UPC-A, EAN-8, Code-128 y **DataMatrix** con caducidad GS1 AI 17 → MM/AAAA); linterna; dos botones en lectura CN |
-| **Re-escaneo inteligente** | Re-escanear abre el formulario en modo nuevo: la deduplicación decide al guardar (suma si es la misma caja, nueva entrada si cambia fecha o familia). Editar desde la tarjeta |
-| **Fusión automática** | Mismo artículo (por código o por nombre) + mismo botiquín + misma caducidad + misma familia → suma cantidades, nunca filas idénticas |
-| **CIMA (AEMPS)** | Consulta el nombre del medicamento por CN al escanear/introducir + chip "Prospecto" que abre el prospecto en el navegador (también disponible al revisar un artículo ya guardado) |
-| **Caducidad visual** | Por MESES (los medicamentos caducan por mes, no por día): OK (>3 meses) · SOON (≤3) · CRITICAL (≤1) · EXPIRED · EMPTY — chips discretos |
-| **Alertas silenciosas** | WorkManager diario → notificación con acciones **Eliminar / Mantener** (borra de la BD aunque la app esté cerrada) |
-| **Multi-botiquín** | Casa · Trabajo · Moto… cada uno con su inventario independiente |
-| **Compartir / Importar** | Exporta un botiquín a JSON (SAF) → envíalo por WhatsApp/Drive → impórtalo en otro dispositivo; **gana el de fecha más reciente** (reemplazo total) |
-| **Backup local** | Exporta/importa todo el inventario vía SAF (JSON) + carpeta de backups para el guardado automático |
-| **Auto-actualización** | Comprueba GitHub Releases al arrancar; crea backup de tus datos antes de descargar e instalar el nuevo APK |
-| **Cero onboarding** | Abres la app y ya estás viendo tu botiquín; si está vacío, pide nombre del primero |
+Mi Botiquín lleva la cuenta de todo lo que tienes en casa: medicinas, vendas, tiritas… Escaneas la caja y la app rellena casi todo por ti. Te avisa cuando algo está a punto de caducar o se ha agotado, y nunca más comprarás dos veces lo mismo por no acordarte.
 
-## 📱 Flujo
+## ✨ Características principales
 
-Abres la app → búsqueda activa → añades → listo.
+- **Escanea y listo** — Apunta con la cámara al código de barras de la caja y la app busca el nombre del medicamento y su caducidad por ti.
+- **Orden por familias** — Agrupa tus productos en familias que tú creas: "Medicamentos", "Analgésicos", "Lo que quieras". Puedes crearlas, renombrarlas y borrarlas desde Ajustes o al vuelo mientras añades.
+- **Avisos que salvan** — Cuando algo caduca este mes, el próximo o se ha agotado, lo ves a simple vista en la lista (colores discretos) y recibes notificaciones.
+- **Sin código, sin problema** — Vendas, cinta y otros artículos sin código de barras: escríbelos a mano. Y si no caducan, marca "No perecedero" y no tendrás que inventarte una fecha.
+- **Nunca duplica** — Si escaneas algo que ya tienes, la app lo suma a lo que había (por ejemplo, x2) en vez de crearlo otra vez.
+- **Prospecto a un toque** — Al añadir o revisar un medicamento, un chip abre su prospecto en el navegador.
+- **Varios botiquines** — Casa, trabajo, moto… cada uno con su propio inventario.
+- **Copia de seguridad y compartir** — Guarda todo tu inventario en un fichero y compártelo con otro dispositivo (WhatsApp, Drive…).
+- **Se actualiza sola** — La app te avisa cuando hay una versión nueva, hace copia de tus datos y descarga la actualización.
 
-**Con cámara**: escaneas el código de barras (o "Introducir CN a mano") → CIMA consulta el nombre → DataMatrix lee la caducidad (o la introduces a mano) → formulario con prefills.
+## 📱 Cómo se usa
 
-**Sin cámara**: eliges "Introducir CN" (teclado → CIMA) o "Introducir medicamento a mano" (formulario directo, para artículos sin código).
+### Añadir un producto
 
-Cero onboarding.
+**Con la cámara** (lo normal):
+1. Toca el botón 📷 de la parte superior.
+2. Apunta al código de barras de la caja → la app busca el nombre.
+3. Apunta al DataMatrix (el cuadradito de la caja) → la app lee la caducidad. Si no lo tiene, introduce la fecha a mano.
+4. Revisa: nombre, familia, cantidad y caducidad → **Guardar**.
 
-## 🏗️ Arquitectura
+**Sin cámara** (o a mano):
+1. Toca el botón 📷 → elige **"Introducir CN"** (el código de 6 dígitos de la caja) o **"Introducir medicamento a mano"** (para artículos sin código, como vendas).
+2. Rellena nombre, familia y caducidad (o marca "No perecedero") → **Guardar**.
 
-```
-app/
-├── data/
-│   ├── api/             # CIMA (AEMPS) + GitHub Releases (Retrofit)
-│   ├── update/          # UpdateChecker (comprobación + descarga de APK)
-│   ├── local/           # Room (ProductEntity, CabinetEntity, CustomCategoryEntity, DAOs, Migraciones v1→v5)
-│   ├── repository/      # ProductRepositoryImpl (deduplicación y fusión a nivel de repositorio)
-│   ├── scan/            # CnExtractor, Gs1Parser (DataMatrix), BarcodeAnalyzer
-│   └── transfer/        # CabinetTransferManager (export/import JSON + merge rule)
-├── domain/
-│   ├── model/           # Product, Cabinet, Category, ExpiryStatus, ProductUiModel, AddProductResult
-│   ├── repository/      # Interfaces
-│   └── usecase/         # GetProducts, CreateCabinet, AddProduct, ...
-├── presentation/
-│   ├── ui/
-│   │   ├── theme/       # Calm Tech (light/dark, tipografía Inter/Roboto Flex)
-│   │   ├── components/  # SearchBar, ProductCard, AddProductSheet, UpdateDialogs, ...
-│   │   └── screen/      # HomeScreen, ScannerScreen, SettingsScreen, SetupScreen
-│   └── navigation/     # NavHost + deep links (mibotiquin://scan)
-└── notifications/      # ExpiryCheckWorker (WorkManager) + ProductActionReceiver
-```
+### Revisar o editar
 
-**Stack**: Kotlin 2.4.10 · AGP 9.1 · Compose 1.7 (Material3) · Room 2.8 · KSP 2.3 · CameraX 1.4 · ML Kit 17.3 · WorkManager 2.9 · Retrofit 2.11
+Toca cualquier tarjeta de la lista: cambia lo que quieras o elimina el producto (icono 🗑).
 
-## 🚀 Instalación
+### Los avisos
 
-```bash
-# Clona y abre en Android Studio
-git clone https://github.com/damagr/mibotiquin.git
+- **Verde/gris**: sin prisa. **Ámbar**: caduca pronto. **Rojo**: caducado o agotado.
+- Una notificación diaria te recuerda lo que necesita atención, con botones para actuar sin abrir la app.
 
-# O instala el APK release directamente
-adb install mibotiquin-release.apk
-```
+### Ajustes (⚙)
 
-## 📦 Release
+- **Familias**: crea, renombra o elimina las tuyas.
+- **Copias de seguridad**: exporta y restaura tu inventario.
+- **Carpeta de backups**: dónde se guardan las copias automáticas al actualizar.
+- **Buscar actualizaciones**: comprueba si hay versión nueva.
 
-```bash
-# Sube versionName en app/build.gradle.kts (debe coincidir con el tag)
-versionName = "1.1.21"
-git push
-git tag v1.1.21 && git push origin v1.1.21
-# → Workflow detecta el tag → build → Release GH con APK
-```
+## 📲 Instalación
+
+1. Descarga el APK desde [GitHub Releases](https://github.com/damagr/mibotiquin/releases/latest).
+2. Ábrelo y acepta instalar desde "fuentes desconocidas" (Android te lo pedirá una vez).
+3. Listo — la app se actualiza sola a partir de ahí.
 
 ## 📄 Licencia
 
