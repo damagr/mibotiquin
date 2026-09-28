@@ -98,6 +98,7 @@ class DiContainer(context: Context) {
                 transferManager = transferManager,
                 preferences = preferences,
                 updateChecker = updateChecker,
+                getProspectoUrlUseCase = GetProspectoUrlUseCase(cimaApi),
                 context = context,
                 productRepository = productRepository
             ) as T

@@ -5,7 +5,9 @@ import com.mibotiquin.domain.model.Product
 import com.mibotiquin.domain.model.AddProductResult
 import com.mibotiquin.domain.model.ProductUiModel
 import com.mibotiquin.domain.repository.ProductRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
 
 // ---- Botiquines ----
 
@@ -78,4 +80,20 @@ class GetExpiredCountUseCase(private val repository: ProductRepository) {
 
 class GetExpiringSoonCountUseCase(private val repository: ProductRepository) {
     suspend operator fun invoke(cabinetId: String): Int = repository.getExpiringSoonCount(cabinetId)
+}
+
+// ---- CIMA (prospecto) ----
+
+/** URL del prospecto (docs tipo 2, urlHtml) para un CN — null si no existe o sin conexión */
+class GetProspectoUrlUseCase(private val api: com.mibotiquin.data.api.CimaApi) {
+    suspend operator fun invoke(cn: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getByCn(cn)
+            response.body()?.docs
+                ?.firstOrNull { it.tipo == 2 }
+                ?.let { it.urlHtml ?: it.url }
+        } catch (_: Exception) {
+            null
+        }
+    }
 }

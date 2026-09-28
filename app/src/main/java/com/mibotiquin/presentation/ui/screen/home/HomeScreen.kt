@@ -225,6 +225,7 @@ fun HomeScreen(
     }
 
     // Editar producto desde la tarjeta de la lista (sin escaneo previo)
+    val editProspectoUrl by viewModel.editProspectoUrl.collectAsStateWithLifecycle()
     editingProduct?.let { product ->
         if (showProductSheet) {
             AddProductSheet(
@@ -234,7 +235,7 @@ fun HomeScreen(
                 prefillExpiryYearMonth = null,
                 prefillCn = null,
                 prefillCimaName = null,
-                prefillProspectoUrl = null,
+                prefillProspectoUrl = editProspectoUrl,
                 categories = allCategories,
                 onSave = { code, name, category, quantity, expiry, isNonPerishable ->
                     viewModel.addProduct(code, name, category, quantity, expiry, isNonPerishable)

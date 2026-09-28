@@ -48,6 +48,7 @@ class HomeViewModel(
     private val transferManager: CabinetTransferManager,
     private val preferences: PreferencesManager,
     private val updateChecker: UpdateChecker,
+    private val getProspectoUrlUseCase: GetProspectoUrlUseCase,
     private val context: Context,
     private val productRepository: ProductRepository
 ) : ViewModel() {
@@ -136,14 +137,27 @@ class HomeViewModel(
     private val _editingProduct = MutableStateFlow<ProductUiModel?>(null)
     val editingProduct: StateFlow<ProductUiModel?> = _editingProduct
 
+    // Prospecto para la ficha de edición (lookup CIMA por código al abrir)
+    private val _editProspectoUrl = MutableStateFlow<String?>(null)
+    val editProspectoUrl: StateFlow<String?> = _editProspectoUrl.asStateFlow()
+
     fun openEditProduct(product: ProductUiModel) {
         _editingProduct.value = product
+        _editProspectoUrl.value = null
         _showProductSheet.value = true
+        // Lookup CIMA por CN → chip Prospecto disponible al revisar un artículo ya guardado
+        val barcode = product.product.barcode
+        if (barcode.isNotBlank()) {
+            viewModelScope.launch {
+                _editProspectoUrl.value = getProspectoUrlUseCase(barcode)
+            }
+        }
     }
 
     fun closeProductSheet() {
         _showProductSheet.value = false
         _editingProduct.value = null
+        _editProspectoUrl.value = null
     }
 
     // ---- Búsqueda ----
