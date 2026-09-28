@@ -31,6 +31,7 @@ object AppDestinations {
     const val KEY_SCANNED_CN = "scanned_cn"
     const val KEY_SCANNED_NAME = "scanned_name"
     const val KEY_SCANNED_EXPIRY = "scanned_expiry"
+    const val KEY_SCANNED_PROSPECTO_URL = "scanned_prospecto_url"
 }
 
 @Composable
@@ -72,6 +73,9 @@ fun AppNavHost(viewModelFactory: ViewModelProvider.Factory) {
             val scannedExpiry by entry.savedStateHandle
                 .getStateFlow<String?>(AppDestinations.KEY_SCANNED_EXPIRY, null)
                 .collectAsStateWithLifecycle()
+            val scannedProspectoUrl by entry.savedStateHandle
+                .getStateFlow<String?>(AppDestinations.KEY_SCANNED_PROSPECTO_URL, null)
+                .collectAsStateWithLifecycle()
 
             HomeScreen(
                 onOpenScanner = { navController.navigate(AppDestinations.SCANNER) },
@@ -79,10 +83,12 @@ fun AppNavHost(viewModelFactory: ViewModelProvider.Factory) {
                 scannedCn = scannedCn,
                 scannedName = scannedName,
                 scannedExpiry = scannedExpiry,
+                scannedProspectoUrl = scannedProspectoUrl,
                 onScanConsumed = {
                     entry.savedStateHandle.remove<String>(AppDestinations.KEY_SCANNED_CN)
                     entry.savedStateHandle.remove<String>(AppDestinations.KEY_SCANNED_NAME)
                     entry.savedStateHandle.remove<String>(AppDestinations.KEY_SCANNED_EXPIRY)
+                    entry.savedStateHandle.remove<String>(AppDestinations.KEY_SCANNED_PROSPECTO_URL)
                 },
                 viewModel = homeViewModel
             )
@@ -101,7 +107,7 @@ fun AppNavHost(viewModelFactory: ViewModelProvider.Factory) {
         ) {
             val scannerViewModel: ScannerViewModel = viewModel(factory = viewModelFactory)
             ScannerScreen(
-                onScanComplete = { cn, name, expiry ->
+                onScanComplete = { cn, name, expiry, prospectoUrl ->
                     navController.previousBackStackEntry?.savedStateHandle?.set(
                         AppDestinations.KEY_SCANNED_CN, cn
                     )
@@ -110,6 +116,9 @@ fun AppNavHost(viewModelFactory: ViewModelProvider.Factory) {
                     )
                     navController.previousBackStackEntry?.savedStateHandle?.set(
                         AppDestinations.KEY_SCANNED_EXPIRY, expiry
+                    )
+                    navController.previousBackStackEntry?.savedStateHandle?.set(
+                        AppDestinations.KEY_SCANNED_PROSPECTO_URL, prospectoUrl
                     )
                     navController.popBackStack()
                 },

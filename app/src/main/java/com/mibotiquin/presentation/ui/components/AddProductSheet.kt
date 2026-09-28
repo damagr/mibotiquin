@@ -62,6 +62,7 @@ fun AddProductSheet(
     prefillExpiryYearMonth: String? = null, // "yyyy-MM" del parser GS1 (DataMatrix)
     prefillCn: String? = null,              // CN 6 dígitos para link prospecto CIMA
     prefillCimaName: String? = null,        // nombre CIMA confirmado (solo si existe en CIMA)
+    prefillProspectoUrl: String? = null,    // URL exacta del prospecto (CIMA docs tipo 2)
     categories: List<Category>,             // lista de categorías disponibles (Medicamentos + custom)
     onSave: (barcode: String, name: String, category: Category, quantity: Int, expiryDate: Long, isNonPerishable: Boolean) -> Unit,
     onAddFamily: (String) -> Unit = {},     // crear familia rápida sin salir del sheet
@@ -150,15 +151,19 @@ fun AddProductSheet(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                // Chip "Prospecto" si tenemos CN confirmado + nombre CIMA
-                if (prefillCn != null && prefillCimaName != null) {
+                // Chip "Prospecto" si tenemos la URL exacta de CIMA (docs tipo 2)
+                if (prefillProspectoUrl != null) {
                     FilterChip(
                         selected = false,
                         onClick = {
-                            val url = "https://cima.aemps.es/cima/dochtml/ft/$prefillCn.html"
-                            openProspectoLauncher.launch(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+                            openProspectoLauncher.launch(
+                                android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse(prefillProspectoUrl)
+                                )
+                            )
                         },
-                        label = { Text("🔗 Prospecto") },
+                        label = { Text("Prospecto") },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.OpenInNew,

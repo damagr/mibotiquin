@@ -79,6 +79,7 @@ fun HomeScreen(
     scannedCn: String? = null,
     scannedName: String? = null,
     scannedExpiry: String? = null,
+    scannedProspectoUrl: String? = null,
     onScanConsumed: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
@@ -207,6 +208,7 @@ fun HomeScreen(
                 prefillExpiryYearMonth = scannedExpiry,
                 prefillCn = barcode,
                 prefillCimaName = scannedName,
+                prefillProspectoUrl = scannedProspectoUrl,
                 categories = allCategories,
                 onSave = { code, name, category, quantity, expiry, isNonPerishable ->
                     viewModel.addProduct(code, name, category, quantity, expiry, isNonPerishable)
@@ -232,6 +234,7 @@ fun HomeScreen(
                 prefillExpiryYearMonth = null,
                 prefillCn = null,
                 prefillCimaName = null,
+                prefillProspectoUrl = null,
                 categories = allCategories,
                 onSave = { code, name, category, quantity, expiry, isNonPerishable ->
                     viewModel.addProduct(code, name, category, quantity, expiry, isNonPerishable)

@@ -68,7 +68,7 @@ import java.util.concurrent.Executors
 
 @Composable
 fun ScannerScreen(
-    onScanComplete: (cn: String, name: String?, expiryYearMonth: String?) -> Unit,
+    onScanComplete: (cn: String, name: String?, expiryYearMonth: String?, prospectoUrl: String?) -> Unit,
     onBack: () -> Unit,
     viewModel: ScannerViewModel
 ) {
@@ -80,6 +80,7 @@ fun ScannerScreen(
     val cn by viewModel.cn.collectAsStateWithLifecycle()
     val cimaName by viewModel.cimaName.collectAsStateWithLifecycle()
     val cimaFound by viewModel.cimaFound.collectAsStateWithLifecycle()
+    val prospectoUrl by viewModel.prospectoUrl.collectAsStateWithLifecycle()
     val dmExpiry by viewModel.dmExpiry.collectAsStateWithLifecycle()
     val dmConfirmed by viewModel.dmConfirmed.collectAsStateWithLifecycle()
 
@@ -116,7 +117,7 @@ fun ScannerScreen(
     // DataMatrix confirmado (lectura o manual) → entregar resultado a Home y volver
     LaunchedEffect(dmConfirmed) {
         if (dmConfirmed) {
-            onScanComplete(cn ?: "", cimaName, dmExpiry)
+            onScanComplete(cn ?: "", cimaName, dmExpiry, prospectoUrl)
         }
     }
 
@@ -164,7 +165,7 @@ fun ScannerScreen(
                 } else {
                     null
                 },
-                onManualItem = { onScanComplete("", null, null) }
+                onManualItem = { onScanComplete("", null, null, null) }
             )
         }
 
@@ -174,7 +175,7 @@ fun ScannerScreen(
                 // Sin cámara: pantalla de elección (como la cámara tiene su estado inicial)
                 ChooseInputScreen(
                     onEnterCn = viewModel::onManualCnRequested,
-                    onManualItem = { onScanComplete("", null, null) },
+                    onManualItem = { onScanComplete("", null, null, null) },
                     onCancel = onBack
                 )
             }
@@ -208,12 +209,12 @@ fun ScannerScreen(
                     onContinue = {
                         if (!viewModel.onContinueAfterCima()) {
                             // Cámara OFF → formulario directo con nombre CIMA
-                            onScanComplete(cn ?: "", cimaName, null)
+                            onScanComplete(cn ?: "", cimaName, null, prospectoUrl)
                         }
                         // cámara ON → el VM ya pasó a DataMatrix
                     },
                     onManualProduct = {
-                        onScanComplete(cn ?: "", null, null)
+                        onScanComplete(cn ?: "", null, null, null)
                     },
                     onRescan = viewModel::onRescan,
                     onCancel = onBack

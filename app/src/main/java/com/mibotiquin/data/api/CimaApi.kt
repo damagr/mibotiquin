@@ -20,7 +20,15 @@ data class CimaMedicamento(
     val labtitular: String?,
     val cpresc: String?,
     val formaFarmaceutica: FormaFarmaceutica?,
-    val presentaciones: List<Presentacion>?
+    val presentaciones: List<Presentacion>?,
+    val docs: List<CimaDoc>?
+)
+
+/** Documentos del medicamento: tipo 1 = Ficha Técnica, tipo 2 = Prospecto */
+data class CimaDoc(
+    val tipo: Int?,
+    val url: String?,      // PDF
+    val urlHtml: String?   // HTML (preferido)
 )
 
 data class FormaFarmaceutica(

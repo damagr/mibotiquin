@@ -39,6 +39,10 @@ class ScannerViewModel(
     private val _cimaName = MutableStateFlow<String?>(null)
     val cimaName: StateFlow<String?> = _cimaName.asStateFlow()
 
+    /** URL del prospecto (CIMA docs tipo 2) — fuente de verdad de la API */
+    private val _prospectoUrl = MutableStateFlow<String?>(null)
+    val prospectoUrl: StateFlow<String?> = _prospectoUrl.asStateFlow()
+
     /** true cuando el CN existe en CIMA (cámara o manual) */
     private val _cimaFound = MutableStateFlow(false)
     val cimaFound: StateFlow<Boolean> = _cimaFound.asStateFlow()
@@ -98,6 +102,7 @@ class ScannerViewModel(
         _step.value = ScanStep.ConsultingCima
         _cimaName.value = null
         _cimaFound.value = false
+        _prospectoUrl.value = null
 
         viewModelScope.launch {
             try {
@@ -107,6 +112,10 @@ class ScannerViewModel(
                 if (med != null) {
                     _cimaName.value = med.nombre
                     _cimaFound.value = true
+                    // Prospecto: URL exacta de la API (docs tipo 2, preferir urlHtml)
+                    _prospectoUrl.value = med.docs
+                        ?.firstOrNull { it.tipo == 2 }
+                        ?.let { it.urlHtml ?: it.url }
                 } else {
                     _cimaName.value = null
                     _cimaFound.value = false
