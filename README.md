@@ -13,7 +13,7 @@
 | **Escáner real** | CameraX + ML Kit (EAN-13, UPC-A, EAN-8, Code-128 y **DataMatrix** con caducidad GS1 AI 17 → MM/AAAA); linterna; dos botones en lectura CN |
 | **Re-escaneo inteligente** | Re-escanear abre el formulario en modo nuevo: la deduplicación decide al guardar (suma si es la misma caja, nueva entrada si cambia fecha o familia). Editar desde la tarjeta |
 | **Fusión automática** | Mismo artículo (por código o por nombre) + mismo botiquín + misma caducidad + misma familia → suma cantidades, nunca filas idénticas |
-| **CIMA (AEMPS)** | Consulta el nombre del medicamento por CN al escanear/introducir + chip "Prospecto" que abre la ficha técnica en el navegador |
+| **CIMA (AEMPS)** | Consulta el nombre del medicamento por CN al escanear/introducir + chip "Prospecto" que abre el prospecto en el navegador (también disponible al revisar un artículo ya guardado) |
 | **Caducidad visual** | Por MESES (los medicamentos caducan por mes, no por día): OK (>3 meses) · SOON (≤3) · CRITICAL (≤1) · EXPIRED · EMPTY — chips discretos |
 | **Alertas silenciosas** | WorkManager diario → notificación con acciones **Eliminar / Mantener** (borra de la BD aunque la app esté cerrada) |
 | **Multi-botiquín** | Casa · Trabajo · Moto… cada uno con su inventario independiente |
