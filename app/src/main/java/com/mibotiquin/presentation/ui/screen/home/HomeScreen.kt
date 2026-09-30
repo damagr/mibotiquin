@@ -65,11 +65,6 @@ import com.mibotiquin.domain.model.ProductUiModel
 import com.mibotiquin.presentation.ui.components.AddProductSheet
 import com.mibotiquin.presentation.ui.components.ProductCard
 import com.mibotiquin.presentation.ui.components.SearchBar
-import com.mibotiquin.presentation.ui.components.UpdateAvailableDialog
-import com.mibotiquin.presentation.ui.components.UpdateDownloadingDialog
-import com.mibotiquin.presentation.ui.components.UpdateErrorDialog
-import com.mibotiquin.presentation.ui.components.UpdateReadyDialog
-import com.mibotiquin.ui.UpdateState
 import androidx.compose.ui.graphics.vector.ImageVector
 
 @Composable
@@ -87,7 +82,6 @@ fun HomeScreen(
     val products by viewModel.products.collectAsStateWithLifecycle()
     val cabinets by viewModel.cabinets.collectAsStateWithLifecycle()
     val activeCabinet by viewModel.activeCabinet.collectAsStateWithLifecycle()
-    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     val useCamera by viewModel.useCamera.collectAsStateWithLifecycle()
     val showProductSheet by viewModel.showProductSheet.collectAsStateWithLifecycle()
     val editingProduct by viewModel.editingProduct.collectAsStateWithLifecycle()
@@ -100,15 +94,6 @@ fun HomeScreen(
         ActivityResultContracts.RequestPermission()
     ) { }
 
-    // Permiso especial "instalar apps desconocidas" (API 26+): al volver de Ajustes, instala
-    val installPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) {
-        val st = viewModel.updateState.value
-        if (st is UpdateState.ReadyToInstall && !viewModel.needsInstallPermission()) {
-            viewModel.installApk(st.file)
-        }
-    }
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= 33 &&
             androidx.core.content.ContextCompat.checkSelfPermission(
@@ -120,8 +105,8 @@ fun HomeScreen(
         // Sin autofoco: el teclado no se abre solo al entrar
     }
 
-    // Diálogos globales (crear/eliminar botiquín + toast de transferencias) viven en AppNavHost,
-    // compartidos con Ajustes. Aquí solo: sheet de producto y diálogos de actualización.
+    // Diálogos globales (crear/eliminar botiquín + toast de transferencias + actualización)
+    // viven en AppNavHost, compartidos con Ajustes. Aquí solo: sheet de producto.
 
     // Status bar height fijo (24dp estándar Android) en lugar de detección automática
     val statusBarPadding = 24.dp
@@ -252,56 +237,6 @@ fun HomeScreen(
         }
     }
 
-    // ---- Diálogos de actualización ----
-
-    when (val state = updateState) {
-        is UpdateState.Available -> {
-            UpdateAvailableDialog(
-                release = state.release,
-                onUpdate = { viewModel.startUpdate(state.release) },
-                onDismiss = viewModel::dismissUpdateDialog
-            )
-        }
-        is UpdateState.Preparing -> {
-            UpdateDownloadingDialog(
-                progress = 0,
-                preparing = true,
-                onCancel = viewModel::cancelUpdate
-            )
-        }
-        is UpdateState.Downloading -> {
-            UpdateDownloadingDialog(
-                progress = state.progress,
-                onCancel = viewModel::cancelUpdate
-            )
-        }
-        is UpdateState.ReadyToInstall -> {
-            UpdateReadyDialog(
-                onInstall = {
-                    val file = state.file
-                    if (viewModel.needsInstallPermission()) {
-                        // Abrir ajustes de "fuentes desconocidas"; al volver, el launcher instala
-                        val intent = Intent(
-                            android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES
-                        ).apply {
-                            data = Uri.parse("package:${context.packageName}")
-                        }
-                        installPermissionLauncher.launch(intent)
-                    } else {
-                        viewModel.installApk(file)
-                    }
-                },
-                onDismiss = viewModel::dismissUpdateDialog
-            )
-        }
-        is UpdateState.Error -> {
-            UpdateErrorDialog(
-                message = state.message,
-                onDismiss = viewModel::dismissUpdateError
-            )
-        }
-        else -> Unit
-    }
 }
 
 // ---- Componentes internos ----

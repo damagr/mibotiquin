@@ -62,6 +62,7 @@ import com.mibotiquin.data.transfer.LocalTransfer
 import com.mibotiquin.domain.model.Category
 import com.mibotiquin.presentation.ui.screen.home.HomeViewModel
 import com.mibotiquin.presentation.ui.theme.MiBotiquinTheme
+import com.mibotiquin.ui.UpdateState
 import kotlinx.coroutines.launch
 
 @Composable
@@ -84,6 +85,9 @@ fun SettingsScreen(
     val transferResult by transferViewModel.transferResult.collectAsStateWithLifecycle()
     var showSendDialog by rememberSaveable { mutableStateOf(false) }
     var showReceiveDialog by rememberSaveable { mutableStateOf(false) }
+
+    // Estado de actualización (para el feedback "Comprobando…" del botón en Acerca de)
+    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
 
     // LaunchedEffect para mostrar toast cuando el ViewModel emite mensaje
     LaunchedEffect(viewModelToast) {
@@ -168,31 +172,6 @@ fun SettingsScreen(
                         .padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // === Cámara ===
-                    SettingsSection(title = "Cámara") {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Escanear códigos con la cámara",
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Switch(
-                                checked = useCamera,
-                                onCheckedChange = { viewModel.onToggleCamera() }
-                            )
-                        }
-                        Text(
-                            text = "Si está desactivada, el botón '+' añade productos manualmente.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    HorizontalDivider()
-
                     // === Botiquines ===
                     SettingsSection(title = "Botiquín") {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -278,6 +257,37 @@ fun SettingsScreen(
 
                     HorizontalDivider()
 
+                    // === Compartir ===
+                    SettingsSection(title = "Compartir") {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "Comparte el botiquín activo por el método que prefieras (WhatsApp, Drive…). Si el otro tiene una versión más reciente, prevalecerá la suya.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Button(
+                                onClick = { viewModel.shareCabinetDirect() },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Compartir botiquín")
+                            }
+                            OutlinedButton(
+                                onClick = { shareCabinetLauncher.launch("botiquin.json") },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Guardar en archivo…")
+                            }
+                            OutlinedButton(
+                                onClick = { importBackupLauncher.launch(arrayOf("application/json")) },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Importar botiquín (JSON)")
+                            }
+                        }
+                    }
+
+                    HorizontalDivider()
+
                     // === Copias de seguridad ===
                     SettingsSection(title = "Copias de seguridad") {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -304,36 +314,17 @@ fun SettingsScreen(
                             ) {
                                 Text("Restaurar backup (JSON)")
                             }
-                        }
-                    }
-
-                    HorizontalDivider()
-
-                    // === Compartir ===
-                    SettingsSection(title = "Compartir") {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // Carpeta de backups automáticos (fusionada aquí)
                             Text(
-                                text = "Comparte el botiquín activo por el método que prefieras (WhatsApp, Bluetooth, Quick Share…). Si el otro tiene una versión más reciente, prevalecerá la suya.",
+                                text = "Los backups automáticos al actualizar la app se guardan aquí.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Button(
-                                onClick = { viewModel.shareCabinetDirect() },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Compartir botiquín")
-                            }
                             OutlinedButton(
-                                onClick = { shareCabinetLauncher.launch("botiquin.json") },
+                                onClick = { backupFolderLauncher.launch(Uri.EMPTY) },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("Guardar en archivo…")
-                            }
-                            OutlinedButton(
-                                onClick = { importBackupLauncher.launch(arrayOf("application/json")) },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Importar botiquín (JSON)")
+                                Text("Elegir carpeta de backups automáticos")
                             }
                         }
                     }
@@ -371,40 +362,44 @@ fun SettingsScreen(
 
                     HorizontalDivider()
 
-                    // === Carpeta de backups ===
-                    SettingsSection(title = "Carpeta de backups") {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                text = "Los backups automáticos al actualizar la app se guardan aquí.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Button(
-                                onClick = { backupFolderLauncher.launch(Uri.EMPTY) },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Elegir carpeta")
-                            }
-                        }
-                    }
-
-                    HorizontalDivider()
-
-                    // === Actualizaciones ===
-                    SettingsSection(title = "Actualizaciones") {
-                        Button(
-                            onClick = { viewModel.checkForUpdate(userInitiated = true) },
-                            modifier = Modifier.fillMaxWidth()
+                    // === Cámara ===
+                    SettingsSection(title = "Cámara") {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Buscar actualizaciones")
+                            Text(
+                                text = "Escanear códigos con la cámara",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Switch(
+                                checked = useCamera,
+                                onCheckedChange = { viewModel.onToggleCamera() }
+                            )
                         }
+                        Text(
+                            text = "Si está desactivada, el botón '+' añade productos manualmente.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
 
                     HorizontalDivider()
 
-                    // === Versión ===
+                    // === Acerca de ===
                     SettingsSection(title = "Acerca de") {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { viewModel.checkForUpdate(userInitiated = true) },
+                                enabled = updateState !is UpdateState.Checking,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    if (updateState is UpdateState.Checking) "Comprobando…"
+                                    else "Buscar actualizaciones"
+                                )
+                            }
                             Text(
                                 text = "MiBotiquín v${BuildConfig.VERSION_NAME}",
                                 style = MaterialTheme.typography.bodyMedium,

@@ -1,5 +1,9 @@
 package com.mibotiquin.presentation.navigation
 
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,12 +20,17 @@ import androidx.navigation.navDeepLink
 import com.mibotiquin.MiBotiquinApplication
 import com.mibotiquin.presentation.ui.components.CreateCabinetDialog
 import com.mibotiquin.presentation.ui.components.DeleteCabinetDialog
+import com.mibotiquin.presentation.ui.components.UpdateAvailableDialog
+import com.mibotiquin.presentation.ui.components.UpdateDownloadingDialog
+import com.mibotiquin.presentation.ui.components.UpdateErrorDialog
+import com.mibotiquin.presentation.ui.components.UpdateReadyDialog
 import com.mibotiquin.presentation.ui.screen.home.HomeScreen
 import com.mibotiquin.presentation.ui.screen.home.HomeViewModel
 import com.mibotiquin.presentation.ui.screen.scanner.ScannerScreen
 import com.mibotiquin.presentation.ui.screen.scanner.ScannerViewModel
 import com.mibotiquin.presentation.ui.screen.settings.SettingsScreen
 import com.mibotiquin.presentation.ui.screen.setup.SetupScreen
+import com.mibotiquin.ui.UpdateState
 
 object AppDestinations {
     const val HOME = "home"
@@ -173,5 +182,68 @@ fun AppNavHost(viewModelFactory: ViewModelProvider.Factory) {
             homeViewModel.importCabinet(android.net.Uri.parse(uriString))
             container.incomingImportUri.value = null
         }
+    }
+
+    // ---- Diálogos de actualización (GLOBALES: visibles desde cualquier pantalla) ----
+
+    val updateState by homeViewModel.updateState.collectAsStateWithLifecycle()
+
+    // Permiso especial "instalar apps desconocidas" (API 26+): al volver de Ajustes, instala
+    val installPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        val st = homeViewModel.updateState.value
+        if (st is UpdateState.ReadyToInstall && !homeViewModel.needsInstallPermission()) {
+            homeViewModel.installApk(st.file)
+        }
+    }
+
+    when (val state = updateState) {
+        is UpdateState.Available -> {
+            UpdateAvailableDialog(
+                release = state.release,
+                onUpdate = { homeViewModel.startUpdate(state.release) },
+                onDismiss = homeViewModel::dismissUpdateDialog
+            )
+        }
+        is UpdateState.Preparing -> {
+            UpdateDownloadingDialog(
+                progress = 0,
+                preparing = true,
+                onCancel = homeViewModel::cancelUpdate
+            )
+        }
+        is UpdateState.Downloading -> {
+            UpdateDownloadingDialog(
+                progress = state.progress,
+                onCancel = homeViewModel::cancelUpdate
+            )
+        }
+        is UpdateState.ReadyToInstall -> {
+            UpdateReadyDialog(
+                onInstall = {
+                    val file = state.file
+                    if (homeViewModel.needsInstallPermission()) {
+                        // Abrir ajustes de "fuentes desconocidas"; al volver, el launcher instala
+                        val intent = Intent(
+                            android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES
+                        ).apply {
+                            data = Uri.parse("package:${context.packageName}")
+                        }
+                        installPermissionLauncher.launch(intent)
+                    } else {
+                        homeViewModel.installApk(file)
+                    }
+                },
+                onDismiss = homeViewModel::dismissUpdateDialog
+            )
+        }
+        is UpdateState.Error -> {
+            UpdateErrorDialog(
+                message = state.message,
+                onDismiss = homeViewModel::dismissUpdateError
+            )
+        }
+        else -> Unit
     }
 }
