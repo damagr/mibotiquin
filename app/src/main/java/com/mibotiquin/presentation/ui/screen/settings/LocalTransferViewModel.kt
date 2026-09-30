@@ -9,6 +9,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/** Qué transferir: el botiquín activo o el backup completo (todos los botiquines) */
+enum class TransferWhat {
+    CABINET,   // botiquín activo
+    BACKUP     // backup completo (todos)
+}
+
 /**
  * Estado de la transferencia directa (misma red WiFi, NSD + sockets).
  * Scoped al entry de Ajustes: al salir, onCleared detiene todo.
@@ -79,14 +85,19 @@ class LocalTransferViewModel(
         _searching.value = false
     }
 
-    /** Envía el botiquín activo (su JSON) a un dispositivo descubierto */
-    fun sendTo(device: LocalTransfer.DiscoveredDevice, cabinetId: String) {
+    /** Envía a un dispositivo descubierto: el botiquín activo o el backup completo según la elección */
+    fun sendTo(device: LocalTransfer.DiscoveredDevice, what: TransferWhat, activeCabinetId: String?) {
         _sending.value = true
         viewModelScope.launch {
-            val json = transferManager.exportJson(cabinetId)
-            _transferResult.value =
-                if (json == null) LocalTransfer.TransferResult.Error("No se pudo leer el botiquín")
-                else localTransfer.sendTo(device, json)
+            val json = when (what) {
+                TransferWhat.CABINET ->
+                    activeCabinetId?.let { transferManager.exportJson(it) }
+                TransferWhat.BACKUP -> transferManager.exportAllJson()
+            }
+            _transferResult.value = when {
+                json == null -> LocalTransfer.TransferResult.Error("No se pudo leer el botiquín")
+                else -> localTransfer.sendTo(device, json)
+            }
             _sending.value = false
         }
     }

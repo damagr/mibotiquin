@@ -31,6 +31,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -257,80 +258,6 @@ fun SettingsScreen(
 
                     HorizontalDivider()
 
-                    // === Compartir ===
-                    SettingsSection(title = "Compartir") {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                text = "Comparte el botiquín activo por el método que prefieras (WhatsApp, Drive…). Si el otro tiene una versión más reciente, prevalecerá la suya.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Button(
-                                onClick = { viewModel.shareCabinetDirect() },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Compartir botiquín")
-                            }
-                            OutlinedButton(
-                                onClick = { shareCabinetLauncher.launch("botiquin.json") },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Guardar en archivo…")
-                            }
-                            OutlinedButton(
-                                onClick = { importBackupLauncher.launch(arrayOf("application/json")) },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Importar botiquín (JSON)")
-                            }
-                        }
-                    }
-
-                    HorizontalDivider()
-
-                    // === Copias de seguridad ===
-                    SettingsSection(title = "Copias de seguridad") {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                text = "El backup incluye TODOS tus botiquines. Se restaura automáticamente solo si eliges el fichero.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Button(
-                                onClick = { viewModel.shareBackupDirect() },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Compartir backup")
-                            }
-                            OutlinedButton(
-                                onClick = { exportBackupLauncher.launch("mibotiquin_backup.json") },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Exportar backup (JSON)")
-                            }
-                            OutlinedButton(
-                                onClick = { importBackupLauncher.launch(arrayOf("application/json")) },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Restaurar backup (JSON)")
-                            }
-                            // Carpeta de backups automáticos (fusionada aquí)
-                            Text(
-                                text = "Los backups automáticos al actualizar la app se guardan aquí.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            OutlinedButton(
-                                onClick = { backupFolderLauncher.launch(Uri.EMPTY) },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Elegir carpeta de backups automáticos")
-                            }
-                        }
-                    }
-
-                    HorizontalDivider()
-
                     // === Transferencia directa (misma red, sin ficheros) ===
                     SettingsSection(title = "Transferencia directa") {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -356,6 +283,68 @@ fun SettingsScreen(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text("Recibir de otro dispositivo")
+                            }
+                        }
+                    }
+
+                    HorizontalDivider()
+
+                    // === Compartir (fichero) ===
+                    SettingsSection(title = "Compartir (fichero)") {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "Guarda el botiquín activo en un fichero o cárgalo desde un fichero. Si el otro tiene una versión más reciente, prevalecerá la suya.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            OutlinedButton(
+                                onClick = { shareCabinetLauncher.launch("botiquin.json") },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Exportar botiquín")
+                            }
+                            OutlinedButton(
+                                onClick = { importBackupLauncher.launch(arrayOf("application/json")) },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Importar botiquín")
+                            }
+                        }
+                    }
+
+                    HorizontalDivider()
+
+                    // === Copias de seguridad ===
+                    SettingsSection(title = "Copias de seguridad") {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "El backup incluye TODOS tus botiquines. Se restaura automáticamente solo si eliges el fichero.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            OutlinedButton(
+                                onClick = { exportBackupLauncher.launch("mibotiquin_backup.json") },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Exportar backup")
+                            }
+                            OutlinedButton(
+                                onClick = { importBackupLauncher.launch(arrayOf("application/json")) },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Restaurar backup")
+                            }
+                            // Carpeta de backups automáticos (fusionada aquí)
+                            Text(
+                                text = "Los backups automáticos al actualizar la app se guardan aquí.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            OutlinedButton(
+                                onClick = { backupFolderLauncher.launch(Uri.EMPTY) },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Elegir carpeta de backups automáticos")
                             }
                         }
                     }
@@ -421,8 +410,11 @@ fun SettingsScreen(
 
     // ---- Diálogos de transferencia directa ----
 
-    // Enviar: lista de dispositivos descubiertos
+    // Enviar: elegir QUÉ transferir + DESTINO (dispositivos NSD o share sheet)
     if (showSendDialog) {
+        // Elección de qué transferir: botiquín activo o backup completo
+        var transferWhat by rememberSaveable { mutableStateOf(TransferWhat.CABINET.name) }
+
         AlertDialog(
             onDismissRequest = {
                 showSendDialog = false
@@ -431,7 +423,27 @@ fun SettingsScreen(
             shape = RoundedCornerShape(0.dp),
             title = { Text("Enviar a otro dispositivo") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // --- Paso 1: QUÉ transferir ---
+                    Text("¿Qué quieres transferir?", style = MaterialTheme.typography.titleSmall)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = transferWhat == TransferWhat.CABINET.name,
+                            onClick = { transferWhat = TransferWhat.CABINET.name },
+                            label = { Text("Botiquín activo") }
+                        )
+                        FilterChip(
+                            selected = transferWhat == TransferWhat.BACKUP.name,
+                            onClick = { transferWhat = TransferWhat.BACKUP.name },
+                            label = { Text("Backup completo") }
+                        )
+                    }
+
+                    // --- Paso 2: DESTINO ---
+                    Text("¿A dónde?", style = MaterialTheme.typography.titleSmall)
                     if (sending) {
                         Text("Enviando…", style = MaterialTheme.typography.bodyLarge)
                     } else if (searching && devices.isEmpty()) {
@@ -452,9 +464,11 @@ fun SettingsScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        activeCabinet?.id?.let { cabinetId ->
-                                            transferViewModel.sendTo(device, cabinetId)
-                                        }
+                                        transferViewModel.sendTo(
+                                            device,
+                                            TransferWhat.valueOf(transferWhat),
+                                            activeCabinet?.id
+                                        )
                                     }
                                     .padding(vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
@@ -467,11 +481,21 @@ fun SettingsScreen(
                             }
                         }
                     }
-                    Text(
-                        text = "Se enviará el botiquín activo. Si el otro dispositivo tiene una versión más reciente, prevalecerá la suya.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+
+                    // Alternativa: compartir por app (share sheet) con lo elegido
+                    OutlinedButton(
+                        onClick = {
+                            showSendDialog = false
+                            transferViewModel.stopDiscovery()
+                            when (TransferWhat.valueOf(transferWhat)) {
+                                TransferWhat.CABINET -> viewModel.shareCabinetDirect()
+                                TransferWhat.BACKUP -> viewModel.shareBackupDirect()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Compartir por app… (WhatsApp, Drive…)")
+                    }
                 }
             },
             confirmButton = {

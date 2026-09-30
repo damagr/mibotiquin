@@ -188,6 +188,30 @@ class CabinetTransferManager(
         )
     }.getOrNull()
 
+    /** Backup completo (TODOS los botiquines) a JSON string — para transferencia directa. */
+    suspend fun exportAllJson(): String? = runCatching {
+        val cabinets = repository.getAllCabinets().first()
+        val payloads = cabinets.map { cab ->
+            val products = repository.getProducts(cab.id).first()
+            TransferPayload(
+                cabinetId = cab.id,
+                name = cab.name,
+                updatedAt = repository.getCabinetLastUpdate(cab.id),
+                products = products.map {
+                    TransferProduct(
+                        barcode = it.product.barcode,
+                        name = it.product.name,
+                        category = getCategoryDisplayName(it.product.category),
+                        quantity = it.product.quantity,
+                        expiryDate = it.product.expiryDate,
+                        isNonPerishable = it.product.isNonPerishable
+                    )
+                }
+            )
+        }
+        gson.toJson(payloads)
+    }.getOrNull()
+
     /** Exporta a una carpeta SAF (árbol elegido por el usuario) usando DocumentFile. */
     suspend fun exportCabinetToFolder(
         cabinetId: String,
