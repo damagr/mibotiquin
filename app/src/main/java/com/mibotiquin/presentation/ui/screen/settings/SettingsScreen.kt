@@ -256,6 +256,12 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Button(
+                                onClick = { viewModel.shareBackupDirect() },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Compartir backup")
+                            }
+                            OutlinedButton(
                                 onClick = { exportBackupLauncher.launch("mibotiquin_backup.json") },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
@@ -276,15 +282,21 @@ fun SettingsScreen(
                     SettingsSection(title = "Compartir") {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(
-                                text = "Comparte el botiquín activo con otro dispositivo. Si el otro tiene una versión más reciente, prevalecerá la suya.",
+                                text = "Comparte el botiquín activo por el método que prefieras (WhatsApp, Bluetooth, Quick Share…). Si el otro tiene una versión más reciente, prevalecerá la suya.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Button(
+                                onClick = { viewModel.shareCabinetDirect() },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Compartir botiquín")
+                            }
+                            OutlinedButton(
                                 onClick = { shareCabinetLauncher.launch("botiquin.json") },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("Compartir este botiquín")
+                                Text("Guardar en archivo…")
                             }
                             OutlinedButton(
                                 onClick = { importBackupLauncher.launch(arrayOf("application/json")) },

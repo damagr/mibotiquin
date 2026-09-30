@@ -27,8 +27,8 @@ android {
         applicationId = "com.mibotiquin"
         minSdk = 26
         targetSdk = 36
-        versionCode = 23
-        versionName = "1.1.23"
+        versionCode = 24
+        versionName = "1.1.24"
     }
 
     buildTypes {

@@ -278,6 +278,47 @@ class HomeViewModel(
         }
     }
 
+    /** Compartir botiquín por el share sheet del sistema (WhatsApp, Bluetooth, Quick Share…) */
+    fun shareCabinetDirect() {
+        val cabinet = _activeCabinet.value ?: return
+        viewModelScope.launch {
+            val file = transferManager.exportCabinetToShareFile(
+                cabinet.id, "botiquin_${cabinet.name.trim()}.json"
+            )
+            if (file == null) {
+                _transferEvent.value = "Error al compartir"
+                return@launch
+            }
+            launchShareSheet(file, "Compartir botiquín")
+        }
+    }
+
+    /** Compartir backup completo por el share sheet del sistema */
+    fun shareBackupDirect() {
+        viewModelScope.launch {
+            val (file, count) = transferManager.exportAllToShareFile(
+                "mibotiquin_backup_${System.currentTimeMillis()}.json"
+            )
+            if (file == null) {
+                _transferEvent.value = "Error al compartir backup"
+                return@launch
+            }
+            launchShareSheet(file, "Compartir backup ($count botiquines)")
+        }
+    }
+
+    private fun launchShareSheet(file: java.io.File, title: String) {
+        val shareUri = FileProvider.getUriForFile(
+            context, "${context.packageName}.fileprovider", file
+        )
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/json"
+            putExtra(Intent.EXTRA_STREAM, shareUri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, title))
+    }
+
     fun importCabinet(uri: Uri) {
         viewModelScope.launch {
             when (val result = transferManager.importAny(uri)) {

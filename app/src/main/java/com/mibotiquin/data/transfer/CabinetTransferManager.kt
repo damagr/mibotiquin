@@ -24,7 +24,8 @@ class CabinetTransferManager(
         val name: String,
         val category: String, // displayName de la categoría
         val quantity: Int,
-        val expiryDate: Long
+        val expiryDate: Long,
+        val isNonPerishable: Boolean = false  // sin caducidad (vendas, cinta, etc.)
     )
 
     data class TransferPayload(
@@ -73,7 +74,8 @@ class CabinetTransferManager(
                             name = it.product.name,
                             category = getCategoryDisplayName(it.product.category),
                             quantity = it.product.quantity,
-                            expiryDate = it.product.expiryDate
+                            expiryDate = it.product.expiryDate,
+                            isNonPerishable = it.product.isNonPerishable
                         )
                     }
                 )
@@ -140,7 +142,8 @@ class CabinetTransferManager(
                     name = it.product.name,
                     category = getCategoryDisplayName(it.product.category),
                     quantity = it.product.quantity,
-                    expiryDate = it.product.expiryDate
+                    expiryDate = it.product.expiryDate,
+                    isNonPerishable = it.product.isNonPerishable
                 )
             }
         )
@@ -163,7 +166,8 @@ class CabinetTransferManager(
                         name = it.product.name,
                         category = getCategoryDisplayName(it.product.category),
                         quantity = it.product.quantity,
-                        expiryDate = it.product.expiryDate
+                        expiryDate = it.product.expiryDate,
+                        isNonPerishable = it.product.isNonPerishable
                     )
                 }
             )
@@ -185,6 +189,48 @@ class CabinetTransferManager(
             out.write(json.toByteArray(Charsets.UTF_8))
         } ?: error("No se pudo escribir el fichero")
     }.isSuccess
+
+    // ---- Ficheros temporales compartibles (share sheet) ----
+
+    /** Botiquín activo a fichero temporal en cacheDir — para compartir por el share sheet. */
+    suspend fun exportCabinetToShareFile(cabinetId: String, fileName: String): java.io.File? = runCatching {
+        val json = exportJson(cabinetId) ?: error("No se pudo leer el botiquín")
+        val dir = java.io.File(context.cacheDir, "compartir")
+        dir.mkdirs()
+        val file = java.io.File(dir, fileName)
+        file.writeText(json, Charsets.UTF_8)
+        file
+    }.getOrNull()
+
+    /** Backup completo (TODOS los botiquines) a fichero temporal — para compartir. */
+    suspend fun exportAllToShareFile(fileName: String): Pair<java.io.File?, Int> {
+        return runCatching {
+            val cabinets = repository.getAllCabinets().first()
+            val payloads = cabinets.map { cab ->
+                val products = repository.getProducts(cab.id).first()
+                TransferPayload(
+                    cabinetId = cab.id,
+                    name = cab.name,
+                    updatedAt = repository.getCabinetLastUpdate(cab.id),
+                    products = products.map {
+                        TransferProduct(
+                            barcode = it.product.barcode,
+                            name = it.product.name,
+                            category = getCategoryDisplayName(it.product.category),
+                            quantity = it.product.quantity,
+                            expiryDate = it.product.expiryDate,
+                            isNonPerishable = it.product.isNonPerishable
+                        )
+                    }
+                )
+            }
+            val dir = java.io.File(context.cacheDir, "compartir")
+            dir.mkdirs()
+            val file = java.io.File(dir, fileName)
+            file.writeText(gson.toJson(payloads), Charsets.UTF_8)
+            file to payloads.size
+        }.getOrDefault(null to 0)
+    }
 
     // ---- Importar ----
 
@@ -227,7 +273,8 @@ class CabinetTransferManager(
                     expiryDate = tp.expiryDate,
                     cabinetId = cabinet.id,
                     createdAt = System.currentTimeMillis(),
-                    updatedAt = payload.updatedAt
+                    updatedAt = payload.updatedAt,
+                    isNonPerishable = tp.isNonPerishable
                 )
             )
         }

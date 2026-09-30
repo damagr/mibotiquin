@@ -58,6 +58,9 @@ class DiContainer(context: Context) {
     }
     val transferManager by lazy { CabinetTransferManager(context, productRepository) }
 
+    /** URI de un fichero entrante (VIEW/SEND json) para importar al llegar */
+    val incomingImportUri = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
     // GitHub API + UpdateChecker
     private val okHttpClient = OkHttpClient.Builder()
         .addInterceptor(okhttp3.logging.HttpLoggingInterceptor().apply { level = okhttp3.logging.HttpLoggingInterceptor.Level.BASIC })

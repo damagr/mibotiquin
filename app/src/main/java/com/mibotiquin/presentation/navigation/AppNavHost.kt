@@ -162,4 +162,13 @@ fun AppNavHost(viewModelFactory: ViewModelProvider.Factory) {
             homeViewModel.onTransferEventShown()
         }
     }
+
+    // Fichero entrante (share/open json) → importar al llegar
+    val incomingImportUri by container.incomingImportUri.collectAsStateWithLifecycle()
+    LaunchedEffect(incomingImportUri) {
+        incomingImportUri?.let { uriString ->
+            homeViewModel.importCabinet(android.net.Uri.parse(uriString))
+            container.incomingImportUri.value = null
+        }
+    }
 }
