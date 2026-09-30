@@ -57,6 +57,7 @@ class DiContainer(context: Context) {
         ProductRepositoryImpl(database.productDao(), database.cabinetDao(), database.customCategoryDao())
     }
     val transferManager by lazy { CabinetTransferManager(context, productRepository) }
+    val localTransfer by lazy { com.mibotiquin.data.transfer.LocalTransfer(context, transferManager) }
 
     /** URI de un fichero entrante (VIEW/SEND json) para importar al llegar */
     val incomingImportUri = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
@@ -107,6 +108,11 @@ class DiContainer(context: Context) {
             ) as T
 
             ScannerViewModel::class.java -> ScannerViewModel(cimaApi, preferences) as T
+
+            com.mibotiquin.presentation.ui.screen.settings.LocalTransferViewModel::class.java ->
+                com.mibotiquin.presentation.ui.screen.settings.LocalTransferViewModel(
+                    localTransfer, transferManager
+                ) as T
 
             else -> throw IllegalArgumentException("ViewModel desconocido: ${modelClass.name}")
         }

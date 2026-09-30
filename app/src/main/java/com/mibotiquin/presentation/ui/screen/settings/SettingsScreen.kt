@@ -58,6 +58,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewModelScope
 import com.mibotiquin.BuildConfig
+import com.mibotiquin.data.transfer.LocalTransfer
 import com.mibotiquin.domain.model.Category
 import com.mibotiquin.presentation.ui.screen.home.HomeViewModel
 import com.mibotiquin.presentation.ui.theme.MiBotiquinTheme
@@ -66,7 +67,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    viewModel: HomeViewModel = viewModel()
+    viewModel: HomeViewModel = viewModel(),
+    transferViewModel: LocalTransferViewModel = viewModel()
 ) {
     val activeCabinet by viewModel.activeCabinet.collectAsStateWithLifecycle()
     val cabinets by viewModel.cabinets.collectAsStateWithLifecycle()
@@ -74,11 +76,40 @@ fun SettingsScreen(
     val ctx = LocalContext.current
     val viewModelToast by viewModel.toastMessage.collectAsStateWithLifecycle()
 
+    // Transferencia directa: dispositivos + estados + resultado
+    val devices by transferViewModel.devices.collectAsStateWithLifecycle()
+    val searching by transferViewModel.searching.collectAsStateWithLifecycle()
+    val listening by transferViewModel.listening.collectAsStateWithLifecycle()
+    val sending by transferViewModel.sending.collectAsStateWithLifecycle()
+    val transferResult by transferViewModel.transferResult.collectAsStateWithLifecycle()
+    var showSendDialog by rememberSaveable { mutableStateOf(false) }
+    var showReceiveDialog by rememberSaveable { mutableStateOf(false) }
+
     // LaunchedEffect para mostrar toast cuando el ViewModel emite mensaje
     LaunchedEffect(viewModelToast) {
         viewModelToast?.let { msg ->
             Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
             viewModel.clearToast()
+        }
+    }
+
+    // Resultado de transferencia directa: toast + cerrar el diálogo correspondiente
+    LaunchedEffect(transferResult) {
+        transferResult?.let { result ->
+            val msg = when (result) {
+                is LocalTransfer.TransferResult.Sent -> "Enviado a ${result.deviceName}"
+                is LocalTransfer.TransferResult.Received ->
+                    "${result.description} recibido (${result.productCount} productos)"
+                is LocalTransfer.TransferResult.RejectedOlderLocal ->
+                    "Transferencia rechazada: tu versión local es más reciente"
+                is LocalTransfer.TransferResult.Error -> result.message
+            }
+            Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show()
+            if (result !is LocalTransfer.TransferResult.Error) {
+                showSendDialog = false
+                showReceiveDialog = false
+            }
+            transferViewModel.consumeResult()
         }
     }
 
@@ -309,6 +340,37 @@ fun SettingsScreen(
 
                     HorizontalDivider()
 
+                    // === Transferencia directa (misma red, sin ficheros) ===
+                    SettingsSection(title = "Transferencia directa") {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "Envía o recibe el botiquín con otro móvil que tenga Mi Botiquín, en tu misma red WiFi y sin ficheros. Si no compartís red: activa el punto de acceso en uno de los dos móviles y conecta el otro a él.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Button(
+                                onClick = {
+                                    transferViewModel.startDiscovery()
+                                    showSendDialog = true
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Enviar a otro dispositivo")
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    transferViewModel.startReceiving()
+                                    showReceiveDialog = true
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Recibir de otro dispositivo")
+                            }
+                        }
+                    }
+
+                    HorizontalDivider()
+
                     // === Carpeta de backups ===
                     SettingsSection(title = "Carpeta de backups") {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -360,6 +422,101 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+
+    // ---- Diálogos de transferencia directa ----
+
+    // Enviar: lista de dispositivos descubiertos
+    if (showSendDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showSendDialog = false
+                transferViewModel.stopDiscovery()
+            },
+            shape = RoundedCornerShape(0.dp),
+            title = { Text("Enviar a otro dispositivo") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (sending) {
+                        Text("Enviando…", style = MaterialTheme.typography.bodyLarge)
+                    } else if (searching && devices.isEmpty()) {
+                        Text(
+                            "Buscando dispositivos con Mi Botiquín en tu red…",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else if (devices.isEmpty()) {
+                        Text(
+                            "No se han encontrado dispositivos. Comprueba que el otro móvil tenga Mi Botiquín abierto y estéis en la misma red WiFi (o en su punto de acceso).",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        devices.forEach { device ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        activeCabinet?.id?.let { cabinetId ->
+                                            transferViewModel.sendTo(device, cabinetId)
+                                        }
+                                    }
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = device.name,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        text = "Se enviará el botiquín activo. Si el otro dispositivo tiene una versión más reciente, prevalecerá la suya.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showSendDialog = false
+                    transferViewModel.stopDiscovery()
+                }) { Text("Cerrar") }
+            }
+        )
+    }
+
+    // Recibir: escuchando
+    if (showReceiveDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showReceiveDialog = false
+                transferViewModel.stopReceiving()
+            },
+            shape = RoundedCornerShape(0.dp),
+            title = { Text("Recibir de otro dispositivo") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Esperando a que el otro dispositivo envíe su botiquín…",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Mantén esta pantalla abierta. Si no compartís red WiFi, activa el punto de acceso en el otro móvil y conecta este a él.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showReceiveDialog = false
+                    transferViewModel.stopReceiving()
+                }) { Text("Cancelar") }
+            }
+        )
     }
 }
 

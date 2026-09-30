@@ -95,9 +95,12 @@ fun AppNavHost(viewModelFactory: ViewModelProvider.Factory) {
         }
 
         composable(route = AppDestinations.SETTINGS) {
+            val transferViewModel: com.mibotiquin.presentation.ui.screen.settings.LocalTransferViewModel =
+                viewModel(factory = viewModelFactory)
             SettingsScreen(
                 onBack = { navController.popBackStack() },
-                viewModel = homeViewModel
+                viewModel = homeViewModel,
+                transferViewModel = transferViewModel
             )
         }
 

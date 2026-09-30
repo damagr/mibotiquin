@@ -98,6 +98,20 @@ class CabinetTransferManager(
                 input.readBytes().toString(Charsets.UTF_8)
             } ?: return ImportResult.Error("No se pudo leer el fichero")
 
+            importJson(json)
+        } catch (e: Exception) {
+            ImportResult.Error("Formato no válido: ${e.message ?: "desconocido"}")
+        }
+    }
+
+    /**
+     * Importa un JSON string detectando el formato automáticamente:
+     * - "[" → array de payloads (backup completo: aplica cada botiquín con su regla de fusión)
+     * - "{" → payload individual (botiquín)
+     * Reutilizado también por la transferencia directa (NSD/sockets).
+     */
+    suspend fun importJson(json: String): ImportResult {
+        return try {
             val trimmed = json.trimStart()
             if (trimmed.startsWith("[")) {
                 val payloads = gson.fromJson(json, Array<TransferPayload>::class.java).toList()
