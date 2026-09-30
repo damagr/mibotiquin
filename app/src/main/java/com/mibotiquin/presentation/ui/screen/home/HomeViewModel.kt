@@ -125,6 +125,9 @@ class HomeViewModel(
     private val _updateState = MutableStateFlow<UpdateState>(UpdateState.UpToDate)
     val updateState: StateFlow<UpdateState> = _updateState
 
+    /** Job de la actualización en curso (para poder cancelarla) */
+    private var updateJob: kotlinx.coroutines.Job? = null
+
     val showUpdateDialog: StateFlow<Boolean> = _updateState
         .map { it is UpdateState.Available }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
@@ -409,10 +412,15 @@ class HomeViewModel(
     }
 
     fun startUpdate(release: com.mibotiquin.data.api.GitHubRelease) {
-        _updateState.value = UpdateState.Downloading(0)
-        viewModelScope.launch {
+        _updateState.value = UpdateState.Preparing
+        updateJob?.cancel()
+        updateJob = viewModelScope.launch {
             try {
-                val activeId = _activeCabinet.value?.id ?: return@launch
+                val activeId = _activeCabinet.value?.id
+                if (activeId == null) {
+                    _updateState.value = UpdateState.Error("No hay botiquín activo")
+                    return@launch
+                }
                 val backupFolderUri = preferences.backupFolderUri
                 if (backupFolderUri == null) {
                     _updateState.value = UpdateState.Error(
@@ -429,17 +437,36 @@ class HomeViewModel(
                     return@launch
                 }
 
-                val apkUrl = release.assets.firstOrNull()?.browserDownloadUrl ?: return@launch
+                // Sin assets = build de Actions aún en curso o fallido → error (no salida silenciosa)
+                val apkUrl = release.assets.firstOrNull()?.browserDownloadUrl
+                if (apkUrl == null) {
+                    _updateState.value = UpdateState.Error(
+                        "El APK aún no está disponible (el build puede seguir en curso). Inténtalo en unos minutos."
+                    )
+                    return@launch
+                }
                 val file = withContext(Dispatchers.IO) {
                     updateChecker.downloadApk(apkUrl) { progress ->
-                        _updateState.value = UpdateState.Downloading(progress)
+                        // Guard: al cancelar, no seguir actualizando el estado
+                        if (updateJob?.isActive == true) {
+                            _updateState.value = UpdateState.Downloading(progress)
+                        }
                     }
                 }
-                _updateState.value = UpdateState.ReadyToInstall(file)
+                if (updateJob?.isActive == true) {
+                    _updateState.value = UpdateState.ReadyToInstall(file)
+                }
             } catch (e: Exception) {
                 _updateState.value = UpdateState.Error(e.message ?: "Error al descargar actualización")
             }
         }
+    }
+
+    /** Cancelar la actualización en curso (backup o descarga) */
+    fun cancelUpdate() {
+        updateJob?.cancel()
+        updateJob = null
+        _updateState.value = UpdateState.UpToDate
     }
 
     fun installApk(file: java.io.File) {

@@ -56,25 +56,40 @@ fun UpdateAvailableDialog(
 }
 
 @Composable
-fun UpdateDownloadingDialog(progress: Int) {
+fun UpdateDownloadingDialog(
+    progress: Int,
+    preparing: Boolean = false,   // true = creando backup (sin barra de progreso)
+    onCancel: (() -> Unit)? = null
+) {
     AlertDialog(
         shape = androidx.compose.ui.graphics.RectangleShape,
-        onDismissRequest = {},
-        title = { Text("Descargando actualización…") },
+        onDismissRequest = { onCancel?.invoke() },
+        title = {
+            Text(
+                if (preparing) "Creando backup de seguridad…"
+                else "Descargando actualización…"
+            )
+        },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                CircularProgressIndicator(
-                    progress = { progress / 100f },
-                    modifier = Modifier.size(48.dp)
-                )
-                Text("$progress%", style = MaterialTheme.typography.titleMedium)
+                if (!preparing) {
+                    CircularProgressIndicator(
+                        progress = { progress / 100f },
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Text("$progress%", style = MaterialTheme.typography.titleMedium)
+                }
             }
         },
-        confirmButton = {}
+        confirmButton = {
+            if (onCancel != null) {
+                TextButton(onClick = onCancel) { Text("Cancelar") }
+            }
+        }
     )
 }
 

@@ -262,8 +262,18 @@ fun HomeScreen(
                 onDismiss = viewModel::dismissUpdateDialog
             )
         }
+        is UpdateState.Preparing -> {
+            UpdateDownloadingDialog(
+                progress = 0,
+                preparing = true,
+                onCancel = viewModel::cancelUpdate
+            )
+        }
         is UpdateState.Downloading -> {
-            UpdateDownloadingDialog(progress = state.progress)
+            UpdateDownloadingDialog(
+                progress = state.progress,
+                onCancel = viewModel::cancelUpdate
+            )
         }
         is UpdateState.ReadyToInstall -> {
             UpdateReadyDialog(
