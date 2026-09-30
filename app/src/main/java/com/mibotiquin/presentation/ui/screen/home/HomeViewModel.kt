@@ -317,9 +317,17 @@ class HomeViewModel(
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "application/json"
             putExtra(Intent.EXTRA_STREAM, shareUri)
+            // ClipData: asegura que el permiso de lectura del URI llega a la app destino
+            // a través del chooser (quirk conocido de Android)
+            clipData = android.content.ClipData.newRawUri(title, shareUri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(Intent.createChooser(intent, title))
+        val chooser = Intent.createChooser(intent, title).apply {
+            // El context del VM es applicationContext: exige este flag para startActivity
+            // (mismo patrón que installApk) — sin él, AndroidRuntimeException y crash
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(chooser)
     }
 
     fun importCabinet(uri: Uri) {
