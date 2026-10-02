@@ -244,10 +244,15 @@ class HomeViewModel(
     fun createCabinet(name: String) {
         if (name.isBlank()) return
         viewModelScope.launch {
-            val cabinet = createCabinetUseCase(name.trim())
-            _activeCabinet.value = cabinet
-            preferences.activeCabinetId = cabinet.id
-            _showCreateCabinet.value = false
+            try {
+                val cabinet = createCabinetUseCase(name.trim())
+                _activeCabinet.value = cabinet
+                preferences.activeCabinetId = cabinet.id
+                _showCreateCabinet.value = false
+            } catch (e: Exception) {
+                // Nombre duplicado u otro error: aviso sin cerrar el diálogo
+                showToast(e.message ?: "No se pudo crear el botiquín")
+            }
         }
     }
 

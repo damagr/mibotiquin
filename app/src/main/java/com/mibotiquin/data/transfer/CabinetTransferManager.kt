@@ -303,7 +303,16 @@ class CabinetTransferManager(
 
         val cabinet = repository.createCabinet(
             payload.name,
-            id = existing?.id ?: payload.cabinetId
+            id = existing?.id ?: run {
+                // Guard: el ID del payload no debe pisar un botiquín existente con OTRO nombre
+                // (REPLACE sobre la PK dejaría productos residuales con dueño equivocado)
+                val byId = repository.getCabinetById(payload.cabinetId)
+                if (byId != null && byId.name != payload.name) {
+                    java.util.UUID.randomUUID().toString()
+                } else {
+                    payload.cabinetId
+                }
+            }
         )
 
         // Familias: recrear las que falten en el destino ANTES de crear los productos

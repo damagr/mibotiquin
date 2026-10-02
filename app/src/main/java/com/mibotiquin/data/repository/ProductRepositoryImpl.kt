@@ -36,6 +36,11 @@ class ProductRepositoryImpl(
         cabinetDao.getByName(name)?.let { Cabinet(it.id, it.name, it.updatedAt, it.createdAt) }
 
     override suspend fun createCabinet(name: String, id: String?): Cabinet {
+        // Nombres únicos: la regla de fusión de importación es por nombre y dos
+        // botiquines homónimos crearían ambigüedad (getCabinetByName, dropdown del Home)
+        if (id == null && cabinetDao.getByName(name.trim()) != null) {
+            throw IllegalStateException("Ya existe un botiquín con ese nombre")
+        }
         val entity = CabinetEntity(
             id = id ?: java.util.UUID.randomUUID().toString(),
             name = name.trim()

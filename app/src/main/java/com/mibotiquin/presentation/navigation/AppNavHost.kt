@@ -175,6 +175,17 @@ fun AppNavHost(viewModelFactory: ViewModelProvider.Factory) {
         }
     }
 
+    // Toast del ViewModel (errores de crear botiquín, etc.) — global
+    val viewModelToast by homeViewModel.toastMessage.collectAsStateWithLifecycle()
+    LaunchedEffect(viewModelToast) {
+        viewModelToast?.let {
+            if (!inSetup) {
+                android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show()
+            }
+            homeViewModel.clearToast()
+        }
+    }
+
     // Fichero entrante (share/open json) → importar al llegar
     val incomingImportUri by container.incomingImportUri.collectAsStateWithLifecycle()
     LaunchedEffect(incomingImportUri) {
