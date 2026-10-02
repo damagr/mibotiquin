@@ -103,6 +103,8 @@ class LocalTransfer(
                 TransferResult.Received("Backup (${r.cabinetCount} botiquines)", r.productCount)
             is CabinetTransferManager.ImportResult.RejectedOlderLocal ->
                 TransferResult.RejectedOlderLocal
+            is CabinetTransferManager.ImportResult.SameData ->
+                TransferResult.Received("Ya tienes estos datos", 0)
             is CabinetTransferManager.ImportResult.Error ->
                 TransferResult.Error(r.message)
         }

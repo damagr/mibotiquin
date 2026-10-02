@@ -343,6 +343,8 @@ class HomeViewModel(
                 }
                 is CabinetTransferManager.ImportResult.RejectedOlderLocal ->
                     _transferEvent.value = "Importación rechazada: tu versión local es más reciente"
+                is CabinetTransferManager.ImportResult.SameData ->
+                    _transferEvent.value = "Ya tienes estos datos (nada que importar)"
                 is CabinetTransferManager.ImportResult.Error ->
                     _transferEvent.value = result.message
             }

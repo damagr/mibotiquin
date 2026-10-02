@@ -32,6 +32,9 @@ class ProductRepositoryImpl(
     override suspend fun getCabinetById(id: String): Cabinet? =
         cabinetDao.getById(id)?.let { Cabinet(it.id, it.name, it.updatedAt, it.createdAt) }
 
+    override suspend fun getCabinetByName(name: String): Cabinet? =
+        cabinetDao.getByName(name)?.let { Cabinet(it.id, it.name, it.updatedAt, it.createdAt) }
+
     override suspend fun createCabinet(name: String, id: String?): Cabinet {
         val entity = CabinetEntity(
             id = id ?: java.util.UUID.randomUUID().toString(),

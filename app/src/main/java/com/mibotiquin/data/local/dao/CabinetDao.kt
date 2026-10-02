@@ -19,6 +19,10 @@ interface CabinetDao {
     @Query("SELECT * FROM cabinets WHERE id = :id")
     suspend fun getById(id: String): CabinetEntity?
 
+    /** Buscar botiquín por nombre — regla de fusión de importación por nombre */
+    @Query("SELECT * FROM cabinets WHERE name = :name LIMIT 1")
+    suspend fun getByName(name: String): CabinetEntity?
+
     @Query("DELETE FROM cabinets WHERE id = :id")
     suspend fun deleteById(id: String)
 

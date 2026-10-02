@@ -40,6 +40,8 @@ class CabinetTransferManager(
         /** Backup completo (todos los botiquines) restaurado */
         data class MultiSuccess(val cabinetCount: Int, val productCount: Int) : ImportResult()
         data object RejectedOlderLocal : ImportResult()
+        /** Los datos importados ya existen (idénticos: misma fecha de actualización) */
+        data object SameData : ImportResult()
         data class Error(val message: String) : ImportResult()
     }
 
@@ -47,13 +49,6 @@ class CabinetTransferManager(
     private fun getCategoryDisplayName(category: Category): String = when (category) {
         is Category.CustomCategory -> category.displayName
         Category.Medicamentos -> category.displayName
-    }
-
-    // Helper: parsear string de categoría a Category
-    private fun parseCategory(categoryName: String): Category {
-        // Primero intentar como CustomCategory (buscar en repo no es posible aquí, asumimos Medicamentos por defecto)
-        // En el futuro se podría buscar en el repo, pero por ahora Medicamentos por defecto
-        return Category.Medicamentos
     }
 
     // ---- Backup completo (TODOS los botiquines) ----
@@ -118,18 +113,21 @@ class CabinetTransferManager(
                     ?: return ImportResult.Error("Formato no válido")
                 var productCount = 0
                 var rejected = false
+                var sameData = 0
                 payloads.forEach { payload ->
                     when (val r = applyPayload(payload)) {
                         is ImportResult.Success -> productCount += r.productCount
                         is ImportResult.RejectedOlderLocal -> rejected = true
+                        is ImportResult.SameData -> sameData++
                         is ImportResult.Error -> return r
                         else -> Unit
                     }
                 }
-                if (rejected && productCount == 0) {
-                    ImportResult.RejectedOlderLocal
-                } else {
-                    ImportResult.MultiSuccess(payloads.size, productCount)
+                when {
+                    // Todo el backup ya está en el destino (idéntico)
+                    sameData == payloads.size -> ImportResult.SameData
+                    rejected && productCount == 0 -> ImportResult.RejectedOlderLocal
+                    else -> ImportResult.MultiSuccess(payloads.size, productCount)
                 }
             } else {
                 val payload = gson.fromJson(json, TransferPayload::class.java)
@@ -288,25 +286,45 @@ class CabinetTransferManager(
     }
 
     suspend fun applyPayload(payload: TransferPayload): ImportResult {
-        val existing = repository.getCabinetById(payload.cabinetId)
+        // Regla de fusión por NOMBRE: si el botiquín no existe en el destino → nuevo
+        val existing = repository.getCabinetByName(payload.name)
 
         if (existing != null) {
-            val localUpdatedAt = repository.getCabinetLastUpdate(payload.cabinetId)
-            if (localUpdatedAt >= payload.updatedAt) {
-                return ImportResult.RejectedOlderLocal
+            val localUpdatedAt = repository.getCabinetLastUpdate(existing.id)
+            when {
+                // La local es más nueva → rechazar
+                localUpdatedAt > payload.updatedAt -> return ImportResult.RejectedOlderLocal
+                // Idénticos (mismo fichero re-importado) → "Ya tienes estos datos"
+                localUpdatedAt == payload.updatedAt -> return ImportResult.SameData
+                // El remoto es más nuevo → reemplazo total
+                else -> repository.deleteCabinet(existing.id)
             }
-            // El remoto es más nuevo → reemplazo total (mismo id)
-            repository.deleteCabinet(payload.cabinetId)
         }
 
-        val cabinet = repository.createCabinet(payload.name, id = payload.cabinetId)
+        val cabinet = repository.createCabinet(
+            payload.name,
+            id = existing?.id ?: payload.cabinetId
+        )
+
+        // Familias: recrear las que falten en el destino ANTES de crear los productos
+        // (los productos importados conservan su familia originaria; si no existe, se crea)
+        val categoryMap = mutableMapOf<String, Category>()
+        payload.products.map { it.category }.distinct().forEach { familyName ->
+            categoryMap[familyName] = when (familyName) {
+                "Medicamentos" -> Category.Medicamentos
+                else -> repository.getAllCategories().first()
+                    .firstOrNull { it.displayName == familyName }
+                    ?: repository.addCustomCategory(familyName)
+            }
+        }
+
         payload.products.forEach { tp ->
             repository.addProduct(
                 Product(
                     id = 0,
                     barcode = tp.barcode,
                     name = tp.name,
-                    category = parseCategory(tp.category),
+                    category = categoryMap[tp.category] ?: Category.Medicamentos,
                     quantity = tp.quantity,
                     expiryDate = tp.expiryDate,
                     cabinetId = cabinet.id,

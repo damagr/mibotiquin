@@ -12,6 +12,7 @@ interface ProductRepository {
     // ---- Botiquines ----
     fun getAllCabinets(): Flow<List<Cabinet>>
     suspend fun getCabinetById(id: String): Cabinet?
+    suspend fun getCabinetByName(name: String): Cabinet?
     suspend fun createCabinet(name: String, id: String? = null): Cabinet
     suspend fun deleteCabinet(id: String)
     suspend fun cabinetCount(): Int
