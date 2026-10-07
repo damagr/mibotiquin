@@ -36,6 +36,7 @@ object AppDestinations {
     const val HOME = "home"
     const val SCANNER = "scanner"
     const val SETTINGS = "settings"
+    const val EXPIRING = "expiring"
     const val DEEP_LINK_SCAN_URI = "mibotiquin://scan"
     const val KEY_SCANNED_CN = "scanned_cn"
     const val KEY_SCANNED_NAME = "scanned_name"
@@ -113,6 +114,13 @@ fun AppNavHost(viewModelFactory: ViewModelProvider.Factory) {
             )
         }
 
+        composable(route = AppDestinations.EXPIRING) {
+            com.mibotiquin.presentation.ui.screen.expiring.ExpiringProductsScreen(
+                onBack = { navController.popBackStack() },
+                viewModel = homeViewModel
+            )
+        }
+
         composable(
             route = AppDestinations.SCANNER,
             deepLinks = listOf(navDeepLink { uriPattern = AppDestinations.DEEP_LINK_SCAN_URI })
@@ -172,6 +180,17 @@ fun AppNavHost(viewModelFactory: ViewModelProvider.Factory) {
                 android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show()
             }
             homeViewModel.onTransferEventShown()
+        }
+    }
+
+    // Notificación de caducidad pulsada → abrir la pantalla de productos por caducar
+    val openExpiring by container.openExpiringScreen.collectAsStateWithLifecycle()
+    LaunchedEffect(openExpiring) {
+        if (openExpiring) {
+            if (!inSetup) {
+                navController.navigate(AppDestinations.EXPIRING) { launchSingleTop = true }
+            }
+            container.openExpiringScreen.value = false
         }
     }
 

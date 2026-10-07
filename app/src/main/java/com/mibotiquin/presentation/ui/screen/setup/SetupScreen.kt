@@ -6,19 +6,24 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.MedicalInformation
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,12 +34,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.mibotiquin.MiBotiquinApplication
 import com.mibotiquin.di.PreferencesManager
 
 enum class SetupStep {
     CHOOSE_CAMERA,
+    CHOOSE_NOTIFS,
     CHOOSE_FOLDER
 }
 
@@ -83,6 +91,17 @@ fun SetupScreen(
                 ChooseCameraStep(
                     onUseCamera = { enabled ->
                         preferences.useCamera = enabled
+                        step = SetupStep.CHOOSE_NOTIFS
+                    }
+                )
+            }
+            SetupStep.CHOOSE_NOTIFS -> {
+                ChooseNotificationsStep(
+                    onConfirm = { cooldownDays, hour ->
+                        preferences.notifCooldownDays = cooldownDays
+                        preferences.notifHour = hour
+                        // La programación se creó con el defecto en onCreate → reprogramar
+                        MiBotiquinApplication.rescheduleExpiryChecks(context)
                         step = SetupStep.CHOOSE_FOLDER
                     }
                 )
@@ -252,6 +271,85 @@ private fun ChooseFolderStep(
             ) {
                 Text("Elegir carpeta")
             }
+        }
+    }
+}
+
+@Composable
+private fun ChooseNotificationsStep(
+    onConfirm: (cooldownDays: Int, hour: Int) -> Unit
+) {
+    var daysText by rememberSaveable { mutableStateOf("7") }
+    var hour by rememberSaveable { mutableStateOf(9) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Notifications,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(80.dp)
+        )
+        Text(
+            text = "Avisos de caducidad",
+            style = MaterialTheme.typography.headlineMedium,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = "¿Cada cuánto quieres que te avisemos de los productos que caducan o están caducados, y a qué hora?",
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(vertical = 16.dp)
+        )
+
+        Text("Recordar cada", style = MaterialTheme.typography.titleSmall)
+        OutlinedTextField(
+            value = daysText,
+            onValueChange = { input ->
+                if (input.length <= 3 && input.all { it.isDigit() }) daysText = input
+            },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            singleLine = true,
+            label = { Text("días (1–365)") },
+            modifier = Modifier
+                .width(180.dp)
+                .padding(top = 8.dp)
+        )
+
+        Text(
+            text = "A la hora",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(top = 16.dp)
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(top = 8.dp)
+        ) {
+            OutlinedButton(onClick = { if (hour > 0) hour-- }) { Text("−") }
+            Text(
+                text = "%02d:00".format(hour),
+                style = MaterialTheme.typography.headlineSmall
+            )
+            OutlinedButton(onClick = { if (hour < 23) hour++ }) { Text("+") }
+        }
+
+        Button(
+            onClick = {
+                val days = daysText.toIntOrNull()?.coerceIn(1, 365) ?: 7
+                onConfirm(days, hour)
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 24.dp)
+        ) {
+            Text("Continuar")
         }
     }
 }

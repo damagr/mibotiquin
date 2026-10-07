@@ -48,6 +48,46 @@ class PreferencesManager(context: Context) {
             .apply()
     }
 
+    // ---- Avisos de caducidad ----
+
+    /** Recordatorio: cada cuántos días avisar (1..365) */
+    var notifCooldownDays: Int
+        get() = prefs.getInt(KEY_NOTIF_COOLDOWN_DAYS, 7).coerceIn(1, 365)
+        set(value) {
+            prefs.edit().putInt(KEY_NOTIF_COOLDOWN_DAYS, value.coerceIn(1, 365)).apply()
+        }
+
+    /** Hora del día de los avisos (0..23), sin minutos */
+    var notifHour: Int
+        get() = prefs.getInt(KEY_NOTIF_HOUR, 9).coerceIn(0, 23)
+        set(value) {
+            prefs.edit().putInt(KEY_NOTIF_HOUR, value.coerceIn(0, 23)).apply()
+        }
+
+    /** Estado de aviso por producto: último estado notificado + fecha + silenciado */
+    data class NotifState(val status: String, val timestamp: Long, val silenced: Boolean)
+
+    fun notifState(productId: Long): NotifState? {
+        val raw = prefs.getString("$KEY_NOTIF_STATE_PREFIX$productId", null) ?: return null
+        val parts = raw.split("|")
+        if (parts.size != 3) return null
+        return NotifState(
+            status = parts[0],
+            timestamp = parts[1].toLongOrNull() ?: 0L,
+            silenced = parts[2] == "1"
+        )
+    }
+
+    fun setNotifState(productId: Long, status: String, timestamp: Long, silenced: Boolean) {
+        prefs.edit()
+            .putString("$KEY_NOTIF_STATE_PREFIX$productId", "$status|$timestamp|${if (silenced) 1 else 0}")
+            .apply()
+    }
+
+    fun clearNotifState(productId: Long) {
+        prefs.edit().remove("$KEY_NOTIF_STATE_PREFIX$productId").apply()
+    }
+
     fun grantBackupFolderPermission(context: Context) {
         backupFolderUri?.let { uriString ->
             try {
@@ -70,5 +110,8 @@ class PreferencesManager(context: Context) {
         private const val KEY_BACKUP_FOLDER_URI = "backup_folder_uri"
         private const val KEY_BACKUP_FOLDER_NAME = "backup_folder_display_name"
         private const val KEY_USE_CAMERA = "use_camera"
+        private const val KEY_NOTIF_COOLDOWN_DAYS = "notif_cooldown_days"
+        private const val KEY_NOTIF_HOUR = "notif_hour"
+        private const val KEY_NOTIF_STATE_PREFIX = "notif_state_"
     }
 }

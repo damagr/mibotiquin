@@ -90,6 +90,12 @@ fun SettingsScreen(
     // Estado de actualización (para el feedback "Comprobando…" del botón en Acerca de)
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
 
+    // Avisos de caducidad (cooldown + hora)
+    val notifCooldownDays by viewModel.notifCooldownDays.collectAsStateWithLifecycle()
+    val notifHour by viewModel.notifHour.collectAsStateWithLifecycle()
+    var showCooldownDialog by rememberSaveable { mutableStateOf(false) }
+    var showHourDialog by rememberSaveable { mutableStateOf(false) }
+
     // LaunchedEffect para mostrar toast cuando el ViewModel emite mensaje
     LaunchedEffect(viewModelToast) {
         viewModelToast?.let { msg ->
@@ -351,6 +357,45 @@ fun SettingsScreen(
 
                     HorizontalDivider()
 
+                    // === Avisos de caducidad ===
+                    SettingsSection(title = "Avisos de caducidad") {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "Te avisamos de los productos que caducan o están caducados. Al empeorar avisa siempre; si sigue igual, recuerda según el intervalo elegido.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Recordar cada",
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                OutlinedButton(onClick = { showCooldownDialog = true }) {
+                                    Text(if (notifCooldownDays == 1) "1 día" else "$notifCooldownDays días")
+                                }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Hora del aviso",
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                OutlinedButton(onClick = { showHourDialog = true }) {
+                                    Text("%02d:00".format(notifHour))
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider()
+
                     // === Cámara ===
                     SettingsSection(title = "Cámara") {
                         Row(
@@ -406,6 +451,74 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+
+    // ---- Diálogos de avisos de caducidad ----
+
+    // Intervalo de recordatorio (1..365 días)
+    if (showCooldownDialog) {
+        var daysText by remember { mutableStateOf(notifCooldownDays.toString()) }
+        AlertDialog(
+            onDismissRequest = { showCooldownDialog = false },
+            shape = RoundedCornerShape(0.dp),
+            title = { Text("Recordar cada") },
+            text = {
+                OutlinedTextField(
+                    value = daysText,
+                    onValueChange = { input ->
+                        if (input.length <= 3 && input.all { it.isDigit() }) daysText = input
+                    },
+                    label = { Text("días (1–365)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val days = daysText.toIntOrNull()?.coerceIn(1, 365) ?: notifCooldownDays
+                    viewModel.setNotifCooldownDays(days)
+                    showCooldownDialog = false
+                }) { Text("Guardar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCooldownDialog = false }) { Text("Cancelar") }
+            }
+        )
+    }
+
+    // Hora del aviso (0..23, sin minutos)
+    if (showHourDialog) {
+        var hour by remember { mutableStateOf(notifHour) }
+        AlertDialog(
+            onDismissRequest = { showHourDialog = false },
+            shape = RoundedCornerShape(0.dp),
+            title = { Text("Hora del aviso") },
+            text = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(onClick = { if (hour > 0) hour-- }) { Text("−") }
+                    Text(
+                        text = "%02d:00".format(hour),
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                    OutlinedButton(onClick = { if (hour < 23) hour++ }) { Text("+") }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.setNotifHour(hour)
+                    showHourDialog = false
+                }) { Text("Guardar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showHourDialog = false }) { Text("Cancelar") }
+            }
+        )
     }
 
     // ---- Diálogos de transferencia directa ----

@@ -31,14 +31,31 @@ class MiBotiquinApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         ExpiryNotificationHelper.createChannel(this)
-        scheduleExpiryChecks()
+        scheduleExpiryChecks(ExistingPeriodicWorkPolicy.KEEP)
     }
 
-    private fun scheduleExpiryChecks() {
-        val request = PeriodicWorkRequestBuilder<ExpiryCheckWorker>(1, TimeUnit.DAYS).build()
+    /**
+     * Programa la comprobación diaria de caducidad alineada a la hora elegida por el usuario
+     * (sin minutos). La primera ejecución se difiere hasta la próxima `notifHour:00`.
+     */
+    private fun scheduleExpiryChecks(policy: ExistingPeriodicWorkPolicy) {
+        val hour = diContainer.preferences.notifHour
+        val now = java.util.Calendar.getInstance()
+        val next = (now.clone() as java.util.Calendar).apply {
+            set(java.util.Calendar.HOUR_OF_DAY, hour)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+            if (before(now)) add(java.util.Calendar.DAY_OF_YEAR, 1)
+        }
+        val initialDelay = next.timeInMillis - now.timeInMillis
+
+        val request = PeriodicWorkRequestBuilder<ExpiryCheckWorker>(1, TimeUnit.DAYS)
+            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+            .build()
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
             ExpiryCheckWorker.WORK_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
+            policy,
             request
         )
     }
@@ -46,6 +63,12 @@ class MiBotiquinApplication : Application() {
     companion object {
         fun container(context: Context): DiContainer =
             (context.applicationContext as MiBotiquinApplication).diContainer
+
+        /** Reprograma la comprobación con la hora actual (tras cambiarla en Ajustes/Setup) */
+        fun rescheduleExpiryChecks(context: Context) {
+            (context.applicationContext as MiBotiquinApplication)
+                .scheduleExpiryChecks(ExistingPeriodicWorkPolicy.REPLACE)
+        }
     }
 }
 
@@ -61,6 +84,9 @@ class DiContainer(context: Context) {
 
     /** URI de un fichero entrante (VIEW/SEND json) para importar al llegar */
     val incomingImportUri = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
+    /** Abrir la pantalla de productos por caducar (desde la notificación resumen) */
+    val openExpiringScreen = kotlinx.coroutines.flow.MutableStateFlow(false)
 
     // GitHub API + UpdateChecker
     private val okHttpClient = OkHttpClient.Builder()

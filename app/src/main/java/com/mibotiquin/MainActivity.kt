@@ -9,6 +9,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import com.mibotiquin.notifications.ExpiryNotificationHelper
 import com.mibotiquin.presentation.navigation.AppNavHost
 import com.mibotiquin.presentation.ui.theme.MiBotiquinTheme
 
@@ -17,7 +18,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        handleImportIntent(intent)
+        handleIntent(intent)
         setContent {
             MiBotiquinTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
@@ -29,18 +30,25 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // App ya abierta (singleTask): fichero recibido por share/open → importar
-        handleImportIntent(intent)
+        // App ya abierta (singleTask): fichero recibido o notificación pulsada
+        handleIntent(intent)
     }
 
     /**
-     * Fichero entrante vía intent (Bluetooth, Quick Share, WhatsApp, Drive, gestor):
-     * - ACTION_VIEW → intent.data
-     * - ACTION_SEND → EXTRA_STREAM
-     * La URI se entrega al contenedor y AppNavHost dispara la importación
-     * (importAny valida el formato; un JSON ajeno → "Formato no válido")
+     * Intents entrantes:
+     * - Fichero para importar (Bluetooth, Quick Share, WhatsApp, Drive, gestor):
+     *   ACTION_VIEW → intent.data · ACTION_SEND → EXTRA_STREAM
+     * - Notificación de caducidad (resumen) → abrir pantalla de productos por caducar
      */
-    private fun handleImportIntent(intent: Intent?) {
+    private fun handleIntent(intent: Intent?) {
+        val container = MiBotiquinApplication.container(this)
+
+        // Notificación → pantalla de gestión
+        if (intent?.getBooleanExtra(ExpiryNotificationHelper.EXTRA_OPEN_EXPIRING, false) == true) {
+            container.openExpiringScreen.value = true
+        }
+
+        // Fichero entrante → importar
         val uri: Uri? = when (intent?.action) {
             Intent.ACTION_VIEW -> intent.data
             Intent.ACTION_SEND -> @Suppress("DEPRECATION")
@@ -48,7 +56,7 @@ class MainActivity : ComponentActivity() {
             else -> null
         }
         if (uri != null) {
-            MiBotiquinApplication.container(this).incomingImportUri.value = uri.toString()
+            container.incomingImportUri.value = uri.toString()
         }
     }
 }

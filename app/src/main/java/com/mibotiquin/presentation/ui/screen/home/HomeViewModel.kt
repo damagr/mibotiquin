@@ -8,15 +8,18 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mibotiquin.BuildConfig
+import com.mibotiquin.MiBotiquinApplication
 import com.mibotiquin.data.transfer.CabinetTransferManager
 import com.mibotiquin.data.update.UpdateChecker
 import com.mibotiquin.di.PreferencesManager
 import com.mibotiquin.domain.model.Cabinet
 import com.mibotiquin.domain.model.Category
+import com.mibotiquin.domain.model.ExpiryStatus
 import com.mibotiquin.domain.model.Product
 import com.mibotiquin.domain.model.ProductUiModel
 import com.mibotiquin.domain.repository.ProductRepository
 import com.mibotiquin.domain.usecase.*
+import com.mibotiquin.notifications.ExpiryNotificationHelper
 import com.mibotiquin.ui.UpdateState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -397,6 +400,62 @@ class HomeViewModel(
         } catch (e: Exception) {
             // Sin rethrow: muestra el error y evita crash de la app
             showToast("Error al eliminar familia: ${e.message}")
+        }
+    }
+
+    // ---- Avisos de caducidad ----
+
+    /** Recordatorio en días (1..365) */
+    private val _notifCooldownDays = MutableStateFlow(preferences.notifCooldownDays)
+    val notifCooldownDays: StateFlow<Int> = _notifCooldownDays.asStateFlow()
+
+    fun setNotifCooldownDays(days: Int) {
+        preferences.notifCooldownDays = days
+        _notifCooldownDays.value = preferences.notifCooldownDays
+    }
+
+    /** Hora del día de los avisos (0..23, sin minutos) */
+    private val _notifHour = MutableStateFlow(preferences.notifHour)
+    val notifHour: StateFlow<Int> = _notifHour.asStateFlow()
+
+    fun setNotifHour(hour: Int) {
+        preferences.notifHour = hour
+        _notifHour.value = preferences.notifHour
+        // Reprogramar la comprobación con la nueva hora
+        MiBotiquinApplication.rescheduleExpiryChecks(context)
+    }
+
+    /** Productos SOON/CRITICAL/EXPIRED de TODOS los botiquines (pantalla de gestión) */
+    val expiringProducts: StateFlow<List<ProductUiModel>> = productRepository.getAllProducts()
+        .map { list ->
+            list.filter {
+                it.expiryStatus == ExpiryStatus.SOON ||
+                it.expiryStatus == ExpiryStatus.CRITICAL ||
+                it.expiryStatus == ExpiryStatus.EXPIRED
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Silenciar productos seleccionados (hasta el próximo empeoramiento) */
+    fun silenceProducts(products: List<ProductUiModel>) {
+        val now = System.currentTimeMillis()
+        products.forEach { p ->
+            preferences.setNotifState(
+                p.product.id, p.expiryStatus.name, now, silenced = true
+            )
+            ExpiryNotificationHelper.cancelProduct(context, p.product.id)
+        }
+    }
+
+    /** Eliminar productos seleccionados */
+    fun deleteProducts(products: List<ProductUiModel>) {
+        viewModelScope.launch {
+            products.forEach { p ->
+                deleteProductUseCase(p.product.id)
+                preferences.clearNotifState(p.product.id)
+                ExpiryNotificationHelper.cancelProduct(context, p.product.id)
+            }
+            ExpiryNotificationHelper.cancelSummary(context)
         }
     }
 
