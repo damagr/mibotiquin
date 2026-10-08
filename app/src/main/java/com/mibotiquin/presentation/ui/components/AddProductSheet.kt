@@ -11,6 +11,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material3.AlertDialog
@@ -67,6 +68,7 @@ fun AddProductSheet(
     onSave: (barcode: String, name: String, category: Category, quantity: Int, expiryDate: Long, isNonPerishable: Boolean) -> Unit,
     onAddFamily: (String) -> Unit = {},     // crear familia rápida sin salir del sheet
     onSaveAndContinue: ((barcode: String, name: String, category: Category, quantity: Int, expiryDate: Long, isNonPerishable: Boolean) -> Unit)? = null,
+    onShareProduct: (() -> Unit)? = null,   // compartir este producto (solo en edición)
     onDelete: (() -> Unit)? = null,   // solo en edición
     onDismiss: () -> Unit
 ) {
@@ -127,15 +129,28 @@ fun AddProductSheet(
                         text = if (existing != null) "Editar producto" else "Añadir producto",
                         style = MaterialTheme.typography.headlineSmall
                     )
-                    if (existing != null && onDelete != null) {
-                        IconButton(
-                            onClick = { showDeleteConfirm = true }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.DeleteOutline,
-                                contentDescription = "Eliminar producto",
-                                tint = MaterialTheme.colorScheme.error
-                            )
+                    if (existing != null) {
+                        Row {
+                            if (onShareProduct != null) {
+                                IconButton(onClick = onShareProduct) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Share,
+                                        contentDescription = "Compartir producto",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                            if (onDelete != null) {
+                                IconButton(
+                                    onClick = { showDeleteConfirm = true }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.DeleteOutline,
+                                        contentDescription = "Eliminar producto",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
                         }
                     }
                 }

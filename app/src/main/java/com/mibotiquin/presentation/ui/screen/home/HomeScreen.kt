@@ -254,6 +254,7 @@ fun HomeScreen(
                 sort = activeSort,
                 onAddProduct = onOpenScanner,
                 onProductClick = viewModel::openEditProduct,
+                onSetQuantity = { p, q -> viewModel.onQuantityChange(p, q) },
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 16.dp)
@@ -317,6 +318,7 @@ fun HomeScreen(
                     viewModel.addProduct(code, name, category, quantity, expiry, isNonPerishable)
                 },
                 onAddFamily = viewModel::addCustomCategoryQuick,
+                onShareProduct = { viewModel.shareProductDirect(product) },
                 onDelete = {
                     viewModel.onDeleteProduct(product)
                     viewModel.closeProductSheet()
@@ -398,6 +400,7 @@ private fun ProductList(
     sort: ProductSort,
     onAddProduct: () -> Unit,
     onProductClick: (ProductUiModel) -> Unit,
+    onSetQuantity: (ProductUiModel, Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (products.isEmpty()) {
@@ -416,7 +419,8 @@ private fun ProductList(
             items(products, key = { it.product.id }) { product ->
                 ProductCard(
                     product = product,
-                    onClick = { onProductClick(product) }
+                    onClick = { onProductClick(product) },
+                    onSetQuantity = { newQty -> onSetQuantity(product, newQty) }
                 )
             }
         }
@@ -436,7 +440,8 @@ private fun ProductList(
             CategorySection(
                 category = category,
                 products = categoryProducts,
-                onProductClick = onProductClick
+                onProductClick = onProductClick,
+                onSetQuantity = onSetQuantity
             )
         }
     }
@@ -446,7 +451,8 @@ private fun ProductList(
 private fun CategorySection(
     category: Category,
     products: List<ProductUiModel>,
-    onProductClick: (ProductUiModel) -> Unit
+    onProductClick: (ProductUiModel) -> Unit,
+    onSetQuantity: (ProductUiModel, Int) -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -487,7 +493,8 @@ private fun CategorySection(
             products.forEach { product ->
                 ProductCard(
                     product = product,
-                    onClick = { onProductClick(product) }
+                    onClick = { onProductClick(product) },
+                    onSetQuantity = { newQty -> onSetQuantity(product, newQty) }
                 )
             }
         }

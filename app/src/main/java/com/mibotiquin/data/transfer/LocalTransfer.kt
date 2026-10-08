@@ -105,6 +105,8 @@ class LocalTransfer(
                 TransferResult.RejectedOlderLocal
             is CabinetTransferManager.ImportResult.SameData ->
                 TransferResult.Received("Ya tienes estos datos", 0)
+            is CabinetTransferManager.ImportResult.ProductAdded ->
+                TransferResult.Received("Producto '${r.name}'", 1)
             is CabinetTransferManager.ImportResult.Error ->
                 TransferResult.Error(r.message)
         }

@@ -92,7 +92,7 @@ class DiContainer(context: Context) {
     val productRepository by lazy {
         ProductRepositoryImpl(database.productDao(), database.cabinetDao(), database.customCategoryDao())
     }
-    val transferManager by lazy { CabinetTransferManager(context, productRepository) }
+    val transferManager by lazy { CabinetTransferManager(context, productRepository, preferences) }
     val localTransfer by lazy { com.mibotiquin.data.transfer.LocalTransfer(context, transferManager) }
 
     /** URI de un fichero entrante (VIEW/SEND json) para importar al llegar */

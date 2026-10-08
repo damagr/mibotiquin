@@ -15,7 +15,8 @@ import kotlinx.coroutines.flow.first
  */
 class CabinetTransferManager(
     private val context: Context,
-    private val repository: ProductRepository
+    private val repository: ProductRepository,
+    private val preferences: com.mibotiquin.di.PreferencesManager
 ) {
     private val gson = Gson()
 
@@ -35,6 +36,17 @@ class CabinetTransferManager(
         val products: List<TransferProduct>
     )
 
+    /** Payload de UN producto individual (compartir "pásame el ibuprofeno"). */
+    data class ProductPayload(
+        val mibotiquinProduct: Boolean, // sin valor por defecto: distingue del payload de botiquín
+        val barcode: String,
+        val name: String,
+        val category: String,
+        val quantity: Int,
+        val expiryDate: Long,
+        val isNonPerishable: Boolean = false
+    )
+
     sealed class ImportResult {
         data class Success(val cabinetId: String, val name: String, val productCount: Int) : ImportResult()
         /** Backup completo (todos los botiquines) restaurado */
@@ -42,6 +54,8 @@ class CabinetTransferManager(
         data object RejectedOlderLocal : ImportResult()
         /** Los datos importados ya existen (idénticos: misma fecha de actualización) */
         data object SameData : ImportResult()
+        /** Producto individual añadido al botiquín activo */
+        data class ProductAdded(val name: String, val newTotal: Int, val merged: Boolean) : ImportResult()
         data class Error(val message: String) : ImportResult()
     }
 
@@ -130,6 +144,13 @@ class CabinetTransferManager(
                     else -> ImportResult.MultiSuccess(payloads.size, productCount)
                 }
             } else {
+                // ¿Producto individual? (payload marcado con mibotiquinProduct)
+                val asProduct = runCatching {
+                    gson.fromJson(json, ProductPayload::class.java)
+                }.getOrNull()
+                if (asProduct?.mibotiquinProduct == true) {
+                    return applyProductPayload(asProduct)
+                }
                 val payload = gson.fromJson(json, TransferPayload::class.java)
                     ?: return ImportResult.Error("Formato no válido")
                 applyPayload(payload)
@@ -139,7 +160,49 @@ class CabinetTransferManager(
         }
     }
 
+    /** Añade un producto individual al BOTIQUÍN ACTIVO (reutiliza la deduplicación al guardar). */
+    private suspend fun applyProductPayload(pp: ProductPayload): ImportResult {
+        val cabinetId = preferences.activeCabinetId
+            ?: return ImportResult.Error("No hay botiquín activo")
+        val result = repository.addProduct(
+            Product(
+                id = 0,
+                barcode = pp.barcode,
+                name = pp.name,
+                category = resolveCategory(pp.category),
+                quantity = pp.quantity,
+                expiryDate = pp.expiryDate,
+                cabinetId = cabinetId,
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis(),
+                isNonPerishable = pp.isNonPerishable
+            )
+        )
+        return ImportResult.ProductAdded(pp.name, result.newTotal, result.merged)
+    }
+
+    /** Busca la familia por nombre o la crea si no existe ("Medicamentos" es la predefinida). */
+    private suspend fun resolveCategory(name: String): Category = when (name) {
+        "Medicamentos" -> Category.Medicamentos
+        else -> repository.getAllCategories().first()
+            .firstOrNull { it.displayName == name }
+            ?: repository.addCustomCategory(name)
+    }
+
     // ---- Exportar ----
+
+    /** Serializa UN producto para compartirlo (el receptor lo añade a su botiquín activo). */
+    fun exportProductJson(product: Product): String = gson.toJson(
+        ProductPayload(
+            mibotiquinProduct = true,
+            barcode = product.barcode,
+            name = product.name,
+            category = getCategoryDisplayName(product.category),
+            quantity = product.quantity,
+            expiryDate = product.expiryDate,
+            isNonPerishable = product.isNonPerishable
+        )
+    )
 
     suspend fun exportCabinet(cabinetId: String, uri: Uri): Boolean = runCatching {
         val cabinet = repository.getCabinetById(cabinetId) ?: error("Botiquín no encontrado")

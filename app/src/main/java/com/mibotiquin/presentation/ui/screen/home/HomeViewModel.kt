@@ -371,6 +371,21 @@ class HomeViewModel(
         }
     }
 
+    /** Compartir UN producto por el share sheet (el receptor lo añade a su botiquín activo) */
+    fun shareProductDirect(product: ProductUiModel) {
+        viewModelScope.launch {
+            try {
+                val json = transferManager.exportProductJson(product.product)
+                val dir = java.io.File(context.cacheDir, "compartir").apply { mkdirs() }
+                val file = java.io.File(dir, "producto_${product.product.id}.json")
+                file.writeText(json, Charsets.UTF_8)
+                launchShareSheet(file, "Compartir producto")
+            } catch (e: Exception) {
+                _transferEvent.value = "Error al compartir el producto"
+            }
+        }
+    }
+
     private fun launchShareSheet(file: java.io.File, title: String) {
         val shareUri = FileProvider.getUriForFile(
             context, "${context.packageName}.fileprovider", file
@@ -406,6 +421,10 @@ class HomeViewModel(
                     _transferEvent.value = "Importación rechazada: tu versión local es más reciente"
                 is CabinetTransferManager.ImportResult.SameData ->
                     _transferEvent.value = "Ya tienes estos datos (nada que importar)"
+                is CabinetTransferManager.ImportResult.ProductAdded ->
+                    _transferEvent.value =
+                        if (result.merged) "Producto '${result.name}' sumado (total ${result.newTotal})"
+                        else "Producto '${result.name}' añadido a tu botiquín"
                 is CabinetTransferManager.ImportResult.Error ->
                     _transferEvent.value = result.message
             }
