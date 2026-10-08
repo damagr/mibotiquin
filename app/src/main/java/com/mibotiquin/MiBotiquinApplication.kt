@@ -32,6 +32,19 @@ class MiBotiquinApplication : Application() {
         super.onCreate()
         ExpiryNotificationHelper.createChannel(this)
         scheduleExpiryChecks(ExistingPeriodicWorkPolicy.KEEP)
+        scheduleAutoBackup()
+    }
+
+    /** Backup automático semanal (solo actúa si el usuario ha elegido carpeta) */
+    private fun scheduleAutoBackup() {
+        val request = PeriodicWorkRequestBuilder<com.mibotiquin.notifications.AutoBackupWorker>(
+            7, TimeUnit.DAYS
+        ).build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            com.mibotiquin.notifications.AutoBackupWorker.WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request
+        )
     }
 
     /**

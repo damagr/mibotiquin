@@ -17,15 +17,34 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.LocalOffer
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -152,25 +171,30 @@ fun SettingsScreen(
     // Status bar height fijo (24dp estándar Android) en lugar de detección automática
     val statusBarPadding = 24.dp
 
+    // Navegación interna de Ajustes (menú ↔ sub-pantallas) sin tocar el NavHost
+    var section by rememberSaveable { mutableStateOf<String?>(null) }
+    var showHelpDialog by rememberSaveable { mutableStateOf(false) }
+    BackHandler(enabled = section != null) { section = null }
+
     MiBotiquinTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Header
+                // Header: ← vuelve al menú (o sale) · título según la sección
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = statusBarPadding, start = 16.dp, end = 16.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { if (section == null) onBack() else section = null }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Atrás",
+                            contentDescription = if (section == null) "Atrás" else "Volver al menú",
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
                     Text(
-                        text = "Ajustes",
+                        text = settingsSectionTitle(section),
                         style = MaterialTheme.typography.headlineSmall,
                         modifier = Modifier.padding(start = 4.dp)
                     )
@@ -185,278 +209,330 @@ fun SettingsScreen(
                         .padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // === Botiquines ===
-                    SettingsSection(title = "Botiquín") {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = activeCabinet?.name ?: "Sin botiquín",
-                                    style = MaterialTheme.typography.titleMedium
+                    when (section) {
+
+                        // ================= MENÚ =================
+                        null -> {
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                SettingsMenuRow(
+                                    icon = Icons.Filled.Inventory2,
+                                    title = "Botiquines",
+                                    subtitle = activeCabinet?.name,
+                                    onClick = { section = "cabinets" }
                                 )
-                                Text(
-                                    text = "${cabinets.size} botiquín(es)",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                SettingsMenuRow(
+                                    icon = Icons.Filled.LocalOffer,
+                                    title = "Familias de medicamentos",
+                                    onClick = { section = "families" }
+                                )
+                                SettingsMenuRow(
+                                    icon = Icons.Filled.Share,
+                                    title = "Compartir y transferir",
+                                    onClick = { section = "share" }
+                                )
+                                SettingsMenuRow(
+                                    icon = Icons.Filled.Backup,
+                                    title = "Copias de seguridad",
+                                    subtitle = if (backupFolderSet) "Automáticas semanales" else "Sin carpeta configurada",
+                                    onClick = { section = "backup" }
+                                )
+                                SettingsMenuRow(
+                                    icon = Icons.Filled.Notifications,
+                                    title = "Avisos de caducidad",
+                                    subtitle = "$notifCooldownDays días · %02d:00".format(notifHour),
+                                    onClick = { section = "notifications" }
+                                )
+                                // Cámara: ajuste único → switch inline
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.PhotoCamera,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(start = 16.dp)
+                                    ) {
+                                        Text("Cámara", style = MaterialTheme.typography.titleMedium)
+                                        Text(
+                                            text = "Escanear códigos con la cámara",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Switch(
+                                        checked = useCamera,
+                                        onCheckedChange = { viewModel.onToggleCamera() }
+                                    )
+                                }
+                                SettingsMenuRow(
+                                    icon = Icons.Filled.Info,
+                                    title = "Acerca de",
+                                    subtitle = "v${BuildConfig.VERSION_NAME}",
+                                    onClick = { section = "about" }
                                 )
                             }
+                        }
 
-                            // Cambiar botiquín activo (igual que el dropdown del Home)
-                            if (cabinets.size > 1) {
-                                var expanded by rememberSaveable { mutableStateOf(false) }
-                                Box {
-                                    OutlinedButton(
-                                        onClick = { expanded = true },
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text("Cambiar botiquín")
-                                        Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
-                                    }
-                                    DropdownMenu(
-                                        expanded = expanded,
-                                        onDismissRequest = { expanded = false }
-                                    ) {
-                                        cabinets.forEach { cabinet ->
-                                            DropdownMenuItem(
-                                                text = {
-                                                    Text(
-                                                        text = cabinet.name,
-                                                        color = if (cabinet.id == activeCabinet?.id)
-                                                            MaterialTheme.colorScheme.primary
-                                                        else
-                                                            MaterialTheme.colorScheme.onSurface
-                                                    )
-                                                },
-                                                onClick = {
-                                                    expanded = false
-                                                    viewModel.selectCabinet(cabinet.id)
-                                                }
-                                            )
+                        // ================= BOTIQUINES =================
+                        "cabinets" -> {
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = activeCabinet?.name ?: "Sin botiquín",
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                    Text(
+                                        text = "${cabinets.size} botiquín(es)",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                if (cabinets.size > 1) {
+                                    var expanded by rememberSaveable { mutableStateOf(false) }
+                                    Box {
+                                        OutlinedButton(
+                                            onClick = { expanded = true },
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Icon(Icons.Filled.SwapHoriz, contentDescription = null)
+                                            Text("  Cambiar botiquín")
+                                        }
+                                        DropdownMenu(
+                                            expanded = expanded,
+                                            onDismissRequest = { expanded = false }
+                                        ) {
+                                            cabinets.forEach { cabinet ->
+                                                DropdownMenuItem(
+                                                    text = {
+                                                        Text(
+                                                            text = cabinet.name,
+                                                            color = if (cabinet.id == activeCabinet?.id)
+                                                                MaterialTheme.colorScheme.primary
+                                                            else
+                                                                MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                    },
+                                                    onClick = {
+                                                        expanded = false
+                                                        viewModel.selectCabinet(cabinet.id)
+                                                    }
+                                                )
+                                            }
                                         }
                                     }
                                 }
-                            }
 
-                            Button(
-                                onClick = { viewModel.onShowCreateCabinet(true) },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Nuevo botiquín")
-                            }
+                                // Acción principal de la pantalla → relleno
+                                Button(
+                                    onClick = { viewModel.onShowCreateCabinet(true) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Filled.Add, contentDescription = null)
+                                    Text("  Nuevo botiquín")
+                                }
 
-                            Button(
-                                onClick = {
-                                    activeCabinet?.let { viewModel.onRequestDeleteCabinet(it) }
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.error
-                                ),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Eliminar botiquín actual")
-                            }
-                        }
-                    }
+                                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
 
-                    HorizontalDivider()
-
-                    // === Familias de medicamentos ===
-                    SettingsSection(title = "Familias de medicamentos") {
-                        CategoryManagementSection(viewModel = viewModel)
-                    }
-
-                    HorizontalDivider()
-
-                    // === Transferencia directa (misma red, sin ficheros) ===
-                    SettingsSection(title = "Transferencia directa") {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                text = "Envía o recibe el botiquín con otro móvil que tenga Mi Botiquín, en tu misma red WiFi y sin ficheros. Si no compartís red: activa el punto de acceso en uno de los dos móviles y conecta el otro a él.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Button(
-                                onClick = {
-                                    transferViewModel.startDiscovery()
-                                    showSendDialog = true
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Enviar a otro dispositivo")
-                            }
-                            OutlinedButton(
-                                onClick = {
-                                    transferViewModel.startReceiving()
-                                    showReceiveDialog = true
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Recibir de otro dispositivo")
+                                // Destructiva → fila roja discreta al final
+                                TextButton(
+                                    onClick = {
+                                        activeCabinet?.let { viewModel.onRequestDeleteCabinet(it) }
+                                    },
+                                    colors = ButtonDefaults.textButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Delete,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text("  Eliminar botiquín actual")
+                                }
                             }
                         }
-                    }
 
-                    HorizontalDivider()
-
-                    // === Compartir (fichero) ===
-                    SettingsSection(title = "Compartir (fichero)") {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                text = "Guarda el botiquín activo en un fichero o cárgalo desde un fichero. Si el otro tiene una versión más reciente, prevalecerá la suya.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            OutlinedButton(
-                                onClick = { shareCabinetLauncher.launch("botiquin.json") },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Exportar botiquín")
-                            }
-                            OutlinedButton(
-                                onClick = { importBackupLauncher.launch(arrayOf("application/json")) },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Importar botiquín")
-                            }
+                        // ================= FAMILIAS =================
+                        "families" -> {
+                            CategoryManagementSection(viewModel = viewModel)
                         }
-                    }
 
-                    HorizontalDivider()
-
-                    // === Copias de seguridad ===
-                    SettingsSection(title = "Copias de seguridad") {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                text = "El backup incluye TODOS tus botiquines. Se restaura automáticamente solo si eliges el fichero.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            if (!backupFolderSet) {
+                        // ================= COMPARTIR Y TRANSFERIR =================
+                        "share" -> {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(
-                                    text = "⚠ No has elegido carpeta de backups: los backups automáticos (incluido el previo a actualizar) no se harán.",
+                                    text = "Misma red WiFi, sin ficheros. Si no compartís red: activa el punto de acceso en uno de los dos móviles y conecta el otro a él.",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.error
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                            }
-                            OutlinedButton(
-                                onClick = { exportBackupLauncher.launch("mibotiquin_backup.json") },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Exportar backup")
-                            }
-                            OutlinedButton(
-                                onClick = { importBackupLauncher.launch(arrayOf("application/json")) },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Restaurar backup")
-                            }
-                            // Carpeta de backups automáticos (fusionada aquí)
-                            Text(
-                                text = "Los backups automáticos al actualizar la app se guardan aquí.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            OutlinedButton(
-                                onClick = { backupFolderLauncher.launch(Uri.EMPTY) },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Elegir carpeta de backups automáticos")
-                            }
-                        }
-                    }
-
-                    HorizontalDivider()
-
-                    // === Avisos de caducidad ===
-                    SettingsSection(title = "Avisos de caducidad") {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                text = "Te avisamos de los productos que caducan o están caducados. Al empeorar avisa siempre; si sigue igual, recuerda según el intervalo elegido.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Recordar cada",
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                                OutlinedButton(onClick = { showCooldownDialog = true }) {
-                                    Text(if (notifCooldownDays == 1) "1 día" else "$notifCooldownDays días")
+                                Button(
+                                    onClick = {
+                                        transferViewModel.startDiscovery()
+                                        showSendDialog = true
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null)
+                                    Text("  Enviar a otro dispositivo")
                                 }
-                            }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        transferViewModel.startReceiving()
+                                        showReceiveDialog = true
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Filled.Download, contentDescription = null)
+                                    Text("  Recibir de otro dispositivo")
+                                }
+
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
                                 Text(
-                                    text = "Hora del aviso",
-                                    style = MaterialTheme.typography.bodyLarge
+                                    text = "Ficheros: guarda el botiquín activo o cárgalo desde un fichero (friends, WhatsApp, Drive…).",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                OutlinedButton(onClick = { showHourDialog = true }) {
-                                    Text("%02d:00".format(notifHour))
+                                OutlinedButton(
+                                    onClick = { shareCabinetLauncher.launch("botiquin.json") },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Filled.Upload, contentDescription = null)
+                                    Text("  Exportar botiquín")
+                                }
+                                OutlinedButton(
+                                    onClick = { importBackupLauncher.launch(arrayOf("application/json")) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Filled.Download, contentDescription = null)
+                                    Text("  Importar botiquín")
                                 }
                             }
                         }
-                    }
 
-                    HorizontalDivider()
-
-                    // === Cámara ===
-                    SettingsSection(title = "Cámara") {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Escanear códigos con la cámara",
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Switch(
-                                checked = useCamera,
-                                onCheckedChange = { viewModel.onToggleCamera() }
-                            )
-                        }
-                        Text(
-                            text = "Si está desactivada, el botón '+' añade productos manualmente.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    HorizontalDivider()
-
-                    // === Acerca de ===
-                    SettingsSection(title = "Acerca de") {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
-                                onClick = { viewModel.checkForUpdate(userInitiated = true) },
-                                enabled = updateState !is UpdateState.Checking,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
+                        // ================= COPIAS DE SEGURIDAD =================
+                        "backup" -> {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(
-                                    if (updateState is UpdateState.Checking) "Comprobando…"
-                                    else "Buscar actualizaciones"
+                                    text = "El backup incluye TODOS tus botiquines. Se restaura automáticamente solo si eliges el fichero.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                if (!backupFolderSet) {
+                                    Text(
+                                        text = "⚠ No has elegido carpeta de backups: los backups automáticos (semanal y previo a actualizar) no se harán.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                                Button(
+                                    onClick = { exportBackupLauncher.launch("mibotiquin_backup.json") },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Filled.Upload, contentDescription = null)
+                                    Text("  Exportar backup")
+                                }
+                                OutlinedButton(
+                                    onClick = { importBackupLauncher.launch(arrayOf("application/json")) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Filled.Download, contentDescription = null)
+                                    Text("  Restaurar backup")
+                                }
+
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                                Text(
+                                    text = "Carpeta de backups automáticos (semanal y antes de actualizar la app).",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                OutlinedButton(
+                                    onClick = { backupFolderLauncher.launch(Uri.EMPTY) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Filled.FolderOpen, contentDescription = null)
+                                    Text("  Elegir carpeta")
+                                }
+                            }
+                        }
+
+                        // ================= AVISOS DE CADUCIDAD =================
+                        "notifications" -> {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    text = "Te avisamos de los productos que caducan o están caducados. Al empeorar avisa siempre; si sigue igual, recuerda según el intervalo elegido.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Recordar cada", style = MaterialTheme.typography.bodyLarge)
+                                    OutlinedButton(onClick = { showCooldownDialog = true }) {
+                                        Text(if (notifCooldownDays == 1) "1 día" else "$notifCooldownDays días")
+                                    }
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Hora del aviso", style = MaterialTheme.typography.bodyLarge)
+                                    OutlinedButton(onClick = { showHourDialog = true }) {
+                                        Text("%02d:00".format(notifHour))
+                                    }
+                                }
+                            }
+                        }
+
+                        // ================= ACERCA DE =================
+                        "about" -> {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = { viewModel.checkForUpdate(userInitiated = true) },
+                                    enabled = updateState !is UpdateState.Checking,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Filled.Refresh, contentDescription = null)
+                                    Text(
+                                        if (updateState is UpdateState.Checking) "  Comprobando…"
+                                        else "  Buscar actualizaciones"
+                                    )
+                                }
+                                OutlinedButton(
+                                    onClick = { showHelpDialog = true },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Filled.HelpOutline, contentDescription = null)
+                                    Text("  ¿Cómo funciona?")
+                                }
+                                Text(
+                                    text = "MiBotiquín v${BuildConfig.VERSION_NAME}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "Icono: \"Farmacia\" de Freepik (Flaticon)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                                 )
                             }
-                            Text(
-                                text = "MiBotiquín v${BuildConfig.VERSION_NAME}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "Icono: \"Farmacia\" de Freepik (Flaticon)",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                            )
                         }
                     }
 
@@ -530,6 +606,52 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showHourDialog = false }) { Text("Cancelar") }
+            }
+        )
+    }
+
+    // ---- Ayuda: ¿Cómo funciona? ----
+    if (showHelpDialog) {
+        AlertDialog(
+            onDismissRequest = { showHelpDialog = false },
+            shape = RoundedCornerShape(0.dp),
+            title = { Text("¿Cómo funciona?") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("📷 Añadir productos", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Toca el botón + y escanea el código de barras: la app busca el nombre. Después lee la caducidad del DataMatrix o la pones a mano con el calendario.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text("🏷 Familias", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Agrupan tus productos: «Medicamentos» + las que crees tú. Puedes crearlas al vuelo con el chip «Nueva» dentro del formulario.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text("🔔 Avisos de caducidad", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Te avisamos antes de que caduquen. Avisa siempre que un producto empeora; si sigue igual, recuerda cada X días a la hora que elijas. «Mantener» silencia hasta que empeore.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text("📤 Compartir y transferir", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "En la misma WiFi, «Enviar/Recibir» pasa el botiquín directo, sin ficheros. Para alguien lejano, usa los ficheros (exportar/importar) o el resumen.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text("💾 Copias de seguridad", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Si eliges una carpeta, se guarda un backup semanal automático y otro antes de cada actualización. También puedes exportar/restaurar a mano.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showHelpDialog = false }) { Text("Entendido") }
             }
         )
     }
@@ -665,21 +787,57 @@ fun SettingsScreen(
     }
 }
 
+/** Título de la pantalla de Ajustes según la sub-sección activa */
+private fun settingsSectionTitle(section: String?): String = when (section) {
+    null -> "Ajustes"
+    "cabinets" -> "Botiquines"
+    "families" -> "Familias de medicamentos"
+    "share" -> "Compartir y transferir"
+    "backup" -> "Copias de seguridad"
+    "notifications" -> "Avisos de caducidad"
+    "about" -> "Acerca de"
+    else -> "Ajustes"
+}
+
+/** Fila de menú (icono + título/subtítulo + chevron) que navega a una sub-pantalla */
 @Composable
-private fun SettingsSection(
+private fun SettingsMenuRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
-    content: @Composable ColumnScope.() -> Unit
+    subtitle: String? = null,
+    onClick: () -> Unit
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary
         )
-        content()
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 16.dp)
+        ) {
+            Text(text = title, style = MaterialTheme.typography.titleMedium)
+            subtitle?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

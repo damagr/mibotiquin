@@ -210,6 +210,22 @@ class CabinetTransferManager(
         gson.toJson(payloads)
     }.getOrNull()
 
+    /**
+     * Backup completo (TODOS los botiquines) a una carpeta SAF con nombre de fichero.
+     * Sobrescribe el fichero si ya existe (evita el renombrado automático "(1)").
+     */
+    suspend fun exportAllToFolder(treeUri: Uri, fileName: String): Boolean = runCatching {
+        val folder = DocumentFile.fromTreeUri(context, treeUri)
+            ?: error("Carpeta de backups no accesible")
+        folder.findFile(fileName)?.delete()
+        val doc = folder.createFile("application/json", fileName)
+            ?: error("No se pudo crear el fichero en la carpeta")
+        val json = exportAllJson() ?: error("No se pudo leer el backup")
+        context.contentResolver.openOutputStream(doc.uri)?.use { out ->
+            out.write(json.toByteArray(Charsets.UTF_8))
+        } ?: error("No se pudo escribir el fichero")
+    }.isSuccess
+
     /** Exporta a una carpeta SAF (árbol elegido por el usuario) usando DocumentFile. */
     suspend fun exportCabinetToFolder(
         cabinetId: String,
