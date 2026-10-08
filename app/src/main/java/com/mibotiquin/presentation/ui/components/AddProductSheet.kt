@@ -66,6 +66,7 @@ fun AddProductSheet(
     categories: List<Category>,             // lista de categorías disponibles (Medicamentos + custom)
     onSave: (barcode: String, name: String, category: Category, quantity: Int, expiryDate: Long, isNonPerishable: Boolean) -> Unit,
     onAddFamily: (String) -> Unit = {},     // crear familia rápida sin salir del sheet
+    onSaveAndContinue: ((barcode: String, name: String, category: Category, quantity: Int, expiryDate: Long, isNonPerishable: Boolean) -> Unit)? = null,
     onDelete: (() -> Unit)? = null,   // solo en edición
     onDismiss: () -> Unit
 ) {
@@ -278,6 +279,31 @@ fun AddProductSheet(
                 ) {
                     Text(if (existing != null) "Guardar cambios" else "Guardar")
                 }
+                // Solo en modo nuevo: guardar y dejar el formulario listo para el siguiente
+                if (existing == null && onSaveAndContinue != null) {
+                    OutlinedButton(
+                        onClick = {
+                            onSaveAndContinue(
+                                barcode,
+                                name.trim(),
+                                category,
+                                quantity,
+                                if (isNonPerishable) 0L
+                                else parsedExpiryMonth.atDay(1)
+                                    .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+                                isNonPerishable
+                            )
+                            // Limpiar el formulario (se conserva la familia elegida)
+                            name = ""
+                            quantity = 1
+                            isNonPerishable = false
+                            expiryMonth = defaultExpiryMonth.toString()
+                        },
+                        enabled = name.isNotBlank()
+                    ) {
+                        Text("Guardar y añadir otro")
+                    }
+                }
             }
         },
         dismissButton = {
@@ -357,14 +383,21 @@ fun AddProductSheet(
     }
 }
 
-/** Picker de mes/año: ◀ MM/AAAA ▶ (los medicamentos caducan por mes, no por día) */
+private val MONTH_SHORT_NAMES =
+    listOf("Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic")
+
+/**
+ * Picker de mes/año tipo calendario: rejilla de meses + selector de año ◀ ▶.
+ * Los medicamentos caducan por MES, así que no se elige día.
+ */
 @Composable
 fun MonthYearPickerDialog(
     initial: YearMonth,
     onConfirm: (YearMonth) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var selected by remember { mutableStateOf(initial) }
+    var year by remember { mutableStateOf(initial.year) }
+    var month by remember { mutableStateOf(initial.monthValue) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -372,30 +405,40 @@ fun MonthYearPickerDialog(
         title = { Text("Fecha de caducidad") },
         text = {
             Column(
+                modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                // Selector de año
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    OutlinedButton(onClick = { selected = selected.minusMonths(1) }) { Text("◀") }
+                    OutlinedButton(onClick = { year-- }) { Text("◀") }
                     Text(
-                        text = "%02d/%04d".format(selected.monthValue, selected.year),
+                        text = year.toString(),
                         style = MaterialTheme.typography.headlineSmall
                     )
-                    OutlinedButton(onClick = { selected = selected.plusMonths(1) }) { Text("▶") }
+                    OutlinedButton(onClick = { year++ }) { Text("▶") }
                 }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(onClick = { selected = selected.minusYears(1) }) { Text("-1 año") }
-                    OutlinedButton(onClick = { selected = selected.plusYears(1) }) { Text("+1 año") }
+
+                // Rejilla de meses (3 filas × 4)
+                MONTH_SHORT_NAMES.chunked(4).forEachIndexed { rowIndex, rowMonths ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        rowMonths.forEachIndexed { colIndex, name ->
+                            val monthNumber = rowIndex * 4 + colIndex + 1
+                            FilterChip(
+                                selected = month == monthNumber,
+                                onClick = { month = monthNumber },
+                                label = { Text(name) }
+                            )
+                        }
+                    }
                 }
             }
         },
         confirmButton = {
-            Button(onClick = { onConfirm(selected) }) { Text("Aceptar") }
+            Button(onClick = { onConfirm(YearMonth.of(year, month)) }) { Text("Aceptar") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancelar") }

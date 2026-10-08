@@ -9,6 +9,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +37,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -157,16 +160,98 @@ fun HomeScreen(
                 )
                 IconButton(onClick = onOpenScanner, modifier = Modifier.size(48.dp)) {
                     Icon(
-                        imageVector = if (useCamera) Icons.Filled.PhotoCamera else Icons.Filled.Add,
-                        contentDescription = if (useCamera) "Escanear producto" else "Añadir producto",
+                        imageVector = Icons.Filled.Add,
+                        contentDescription = "Añadir producto",
                         tint = MaterialTheme.colorScheme.primary
                     )
+                }
+            }
+
+            // Chips de filtro (con contadores) — combinables con la búsqueda
+            // Chip "Agotados" = lista de la compra · "Por caducar"/"Caducados" = estado de caducidad
+            val upcoming by viewModel.upcomingCount.collectAsStateWithLifecycle()
+            val expired by viewModel.expiredCount.collectAsStateWithLifecycle()
+            val empty by viewModel.emptyCount.collectAsStateWithLifecycle()
+            val activeFilter by viewModel.filter.collectAsStateWithLifecycle()
+            val activeSort by viewModel.sort.collectAsStateWithLifecycle()
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = activeFilter == ProductFilter.ALL,
+                    onClick = { viewModel.setFilter(ProductFilter.ALL) },
+                    label = { Text("Todos") }
+                )
+                FilterChip(
+                    selected = activeFilter == ProductFilter.UPCOMING,
+                    onClick = { viewModel.setFilter(ProductFilter.UPCOMING) },
+                    label = { Text("Por caducar $upcoming") }
+                )
+                FilterChip(
+                    selected = activeFilter == ProductFilter.EXPIRED,
+                    onClick = { viewModel.setFilter(ProductFilter.EXPIRED) },
+                    label = { Text("Caducados $expired") }
+                )
+                FilterChip(
+                    selected = activeFilter == ProductFilter.EMPTY,
+                    onClick = { viewModel.setFilter(ProductFilter.EMPTY) },
+                    label = { Text("Agotados $empty") }
+                )
+            }
+
+            // Ordenación (Opción B): texto con el criterio activo + desplegable
+            var sortMenuOpen by remember { mutableStateOf(false) }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Ordenar:",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Box {
+                    TextButton(onClick = { sortMenuOpen = true }) {
+                        Text(
+                            if (activeSort == ProductSort.FAMILY) "Familia" else "Caducidad"
+                        )
+                        Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+                    }
+                    DropdownMenu(
+                        expanded = sortMenuOpen,
+                        onDismissRequest = { sortMenuOpen = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Familia") },
+                            onClick = {
+                                viewModel.setSort(ProductSort.FAMILY)
+                                sortMenuOpen = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Caducidad") },
+                            onClick = {
+                                viewModel.setSort(ProductSort.EXPIRY)
+                                sortMenuOpen = false
+                            }
+                        )
+                    }
                 }
             }
 
             ProductList(
                 products = products,
                 query = query,
+                filter = activeFilter,
+                sort = activeSort,
                 onAddProduct = onOpenScanner,
                 onProductClick = viewModel::openEditProduct,
                 modifier = Modifier
@@ -198,6 +283,12 @@ fun HomeScreen(
                 onSave = { code, name, category, quantity, expiry, isNonPerishable ->
                     viewModel.addProduct(code, name, category, quantity, expiry, isNonPerishable)
                     onScanConsumed()
+                },
+                onSaveAndContinue = { code, name, category, quantity, expiry, isNonPerishable ->
+                    // Guarda y deja el formulario abierto para el siguiente (vuelta de la farmacia)
+                    viewModel.addProduct(
+                        code, name, category, quantity, expiry, isNonPerishable, keepOpen = true
+                    )
                 },
                 onAddFamily = viewModel::addCustomCategoryQuick,
                 onDelete = null,
@@ -303,12 +394,32 @@ private fun CabinetHeader(
 private fun ProductList(
     products: List<ProductUiModel>,
     query: String,
+    filter: ProductFilter,
+    sort: ProductSort,
     onAddProduct: () -> Unit,
     onProductClick: (ProductUiModel) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (products.isEmpty()) {
-        EmptyState(query = query, onAddProduct = onAddProduct)
+        EmptyState(query = query, filter = filter, onAddProduct = onAddProduct)
+        return
+    }
+
+    // Orden por caducidad → lista plana (lo que antes expira primero).
+    // Orden por familia → agrupada por familia (comportamiento de siempre).
+    if (sort == ProductSort.EXPIRY) {
+        LazyColumn(
+            modifier = modifier,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(top = 8.dp)
+        ) {
+            items(products, key = { it.product.id }) { product ->
+                ProductCard(
+                    product = product,
+                    onClick = { onProductClick(product) }
+                )
+            }
+        }
         return
     }
 
@@ -386,8 +497,17 @@ private fun CategorySection(
 @Composable
 private fun EmptyState(
     query: String,
+    filter: ProductFilter,
     onAddProduct: () -> Unit
 ) {
+    // Mensaje según el filtro activo (los filtros de estado no sugieren "añadir")
+    val filteredMessage: String? = when (filter) {
+        ProductFilter.UPCOMING -> "No hay productos próximos a caducar"
+        ProductFilter.EXPIRED -> "No hay productos caducados"
+        ProductFilter.EMPTY -> "No hay productos agotados"
+        ProductFilter.ALL -> null
+    }
+
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -403,25 +523,28 @@ private fun EmptyState(
                 modifier = Modifier.size(80.dp)
             )
             Text(
-                text = if (query.isBlank())
-                    stringResource(R.string.empty_no_products)
-                else
-                    stringResource(R.string.empty_no_results, query),
+                text = filteredMessage
+                    ?: if (query.isBlank())
+                        stringResource(R.string.empty_no_products)
+                    else
+                        stringResource(R.string.empty_no_results, query),
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Text(
-                text = stringResource(R.string.empty_add_first),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 32.dp)
-            )
-            androidx.compose.material3.FilledTonalButton(
-                onClick = onAddProduct,
-                modifier = Modifier.padding(top = 8.dp)
-            ) {
-                Text(text = "Escanear código de barras", style = MaterialTheme.typography.labelLarge)
+            if (filteredMessage == null) {
+                Text(
+                    text = stringResource(R.string.empty_add_first),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 32.dp)
+                )
+                androidx.compose.material3.FilledTonalButton(
+                    onClick = onAddProduct,
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    Text(text = "Escanear código de barras", style = MaterialTheme.typography.labelLarge)
+                }
             }
         }
     }

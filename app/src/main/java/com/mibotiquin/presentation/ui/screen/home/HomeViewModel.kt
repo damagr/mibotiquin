@@ -166,21 +166,73 @@ class HomeViewModel(
         _editProspectoUrl.value = null
     }
 
-    // ---- Búsqueda ----
+    // ---- Búsqueda / filtros / orden ----
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
 
-    val products: StateFlow<List<ProductUiModel>> =
-        combine(_searchQuery, _activeCabinet) { query, cabinet -> query to cabinet }
-            .flatMapLatest { (query, cabinet) ->
-                when {
-                    cabinet == null -> flowOf(emptyList())
-                    query.isBlank() -> getProductsUseCase(cabinet.id)
-                    else -> searchProductsUseCase(cabinet.id, query)
-                }
+    // Lista completa del botiquín activo (sin filtros) — base para contadores y filtrado
+    private val cabinetProducts: StateFlow<List<ProductUiModel>> =
+        _activeCabinet.flatMapLatest { cabinet ->
+            if (cabinet == null) flowOf(emptyList()) else getProductsUseCase(cabinet.id)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // Contadores por estado (chips)
+    val upcomingCount: StateFlow<Int> = cabinetProducts
+        .map { list ->
+            list.count {
+                it.expiryStatus == ExpiryStatus.SOON || it.expiryStatus == ExpiryStatus.CRITICAL
             }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    val expiredCount: StateFlow<Int> = cabinetProducts
+        .map { list -> list.count { it.expiryStatus == ExpiryStatus.EXPIRED } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    val emptyCount: StateFlow<Int> = cabinetProducts
+        .map { list -> list.count { it.expiryStatus == ExpiryStatus.EMPTY } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    // Filtro activo (chip)
+    private val _filter = MutableStateFlow(ProductFilter.ALL)
+    val filter: StateFlow<ProductFilter> = _filter.asStateFlow()
+    fun setFilter(value: ProductFilter) { _filter.value = value }
+
+    // Orden activo
+    private val _sort = MutableStateFlow(ProductSort.FAMILY)
+    val sort: StateFlow<ProductSort> = _sort.asStateFlow()
+    fun setSort(value: ProductSort) { _sort.value = value }
+
+    /**
+     * Lista mostrada: texto (sin acentos; busca en nombre, código y familia) + filtro + orden.
+     * Filtrado en memoria: el inventario doméstico es pequeño y permite acentos/familia combinados.
+     */
+    val products: StateFlow<List<ProductUiModel>> =
+        combine(cabinetProducts, _searchQuery, _filter, _sort) { list, query, filter, sort ->
+            val q = query.normalizeForSearch()
+            val filtered = list.filter { p ->
+                val matchesQuery = q.isBlank() ||
+                        p.product.name.normalizeForSearch().contains(q) ||
+                        p.product.barcode.normalizeForSearch().contains(q) ||
+                        p.product.category.displayName.normalizeForSearch().contains(q)
+                val matchesFilter = when (filter) {
+                    ProductFilter.ALL -> true
+                    ProductFilter.UPCOMING ->
+                        p.expiryStatus == ExpiryStatus.SOON || p.expiryStatus == ExpiryStatus.CRITICAL
+                    ProductFilter.EXPIRED -> p.expiryStatus == ExpiryStatus.EXPIRED
+                    ProductFilter.EMPTY -> p.expiryStatus == ExpiryStatus.EMPTY
+                }
+                matchesQuery && matchesFilter
+            }
+            when (sort) {
+                ProductSort.FAMILY -> filtered
+                // Por caducidad: perecederos por fecha primero; los no perecederos al final
+                ProductSort.EXPIRY -> filtered.sortedWith(
+                    compareBy({ it.product.isNonPerishable }, { it.product.expiryDate })
+                )
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun onSearchQueryChange(query: String) { _searchQuery.value = query.trim() }
 
@@ -198,7 +250,8 @@ class HomeViewModel(
 
     fun addProduct(
         barcode: String, name: String, category: Category, quantity: Int, expiryDate: Long,
-        isNonPerishable: Boolean = false
+        isNonPerishable: Boolean = false,
+        keepOpen: Boolean = false   // true = "Guardar y añadir otro" (no cerrar el sheet)
     ) {
         val cabinet = _activeCabinet.value ?: return
         viewModelScope.launch {
@@ -222,7 +275,7 @@ class HomeViewModel(
             } catch (e: Exception) {
                 _transferEvent.value = "Error al guardar el producto"
             }
-            closeProductSheet()
+            if (!keepOpen) closeProductSheet()
         }
     }
 
@@ -384,6 +437,9 @@ class HomeViewModel(
     fun addCustomCategoryQuick(name: String) {
         viewModelScope.launch { addCustomCategory(name) }
     }
+
+    /** ¿Hay carpeta de backups configurada? (si no, no se hacen backups automáticos) */
+    fun hasBackupFolder(): Boolean = preferences.backupFolderUri != null
 
     suspend fun renameCustomCategory(id: String, newName: String) {
         try {
@@ -557,3 +613,15 @@ class HomeViewModel(
     fun dismissUpdateError() { _updateState.value = UpdateState.UpToDate }
     fun needsInstallPermission(): Boolean = context.packageManager.canRequestPackageInstalls().not()
 }
+
+/** Filtro de la lista del Home (chips) */
+enum class ProductFilter { ALL, UPCOMING, EXPIRED, EMPTY }
+
+/** Orden de la lista del Home */
+enum class ProductSort { FAMILY, EXPIRY }
+
+/** Normaliza para búsqueda: minúsculas y sin acentos ("Ácido" → "acido") */
+private fun String.normalizeForSearch(): String =
+    java.text.Normalizer.normalize(this, java.text.Normalizer.Form.NFD)
+        .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
+        .lowercase()

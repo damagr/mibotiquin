@@ -139,9 +139,15 @@ fun SettingsScreen(
             viewModel.shareCabinet(it)
         }
     }
+    var backupFolderSet by remember { mutableStateOf(viewModel.hasBackupFolder()) }
     val backupFolderLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
-    ) { uri -> uri?.let { saveBackupFolder(ctx, it) } }
+    ) { uri ->
+        uri?.let {
+            saveBackupFolder(ctx, it)
+            backupFolderSet = true
+        }
+    }
 
     // Status bar height fijo (24dp estándar Android) en lugar de detección automática
     val statusBarPadding = 24.dp
@@ -328,6 +334,13 @@ fun SettingsScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            if (!backupFolderSet) {
+                                Text(
+                                    text = "⚠ No has elegido carpeta de backups: los backups automáticos (incluido el previo a actualizar) no se harán.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
                             OutlinedButton(
                                 onClick = { exportBackupLauncher.launch("mibotiquin_backup.json") },
                                 modifier = Modifier.fillMaxWidth()

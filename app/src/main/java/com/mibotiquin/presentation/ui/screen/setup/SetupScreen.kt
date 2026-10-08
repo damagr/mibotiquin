@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.MedicalInformation
 import androidx.compose.material.icons.filled.Notifications
@@ -43,7 +44,8 @@ import com.mibotiquin.di.PreferencesManager
 enum class SetupStep {
     CHOOSE_CAMERA,
     CHOOSE_NOTIFS,
-    CHOOSE_FOLDER
+    CHOOSE_FOLDER,
+    DONE
 }
 
 /**
@@ -81,7 +83,7 @@ fun SetupScreen(
                 // Provider no persistible: guardamos la URI igualmente
                 preferences.backupFolderUri = uri.toString()
             }
-            onComplete()
+            step = SetupStep.DONE
         }
     }
 
@@ -116,9 +118,50 @@ fun SetupScreen(
                     },
                     // Saltar: sin carpeta SAF → almacenamiento interno va a ser el destino por
                     // defecto de los backups (Home + diálogo de primer botiquín a continuación)
-                    onSkip = onComplete
+                    onSkip = { step = SetupStep.DONE }
                 )
             }
+            SetupStep.DONE -> {
+                DoneStep(onStart = onComplete)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DoneStep(onStart: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = Icons.Filled.CheckCircle,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(80.dp)
+        )
+        Text(
+            text = "¡Todo listo!",
+            style = MaterialTheme.typography.headlineMedium,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = "Ya puedes empezar a llenar tu botiquín. Escanea los códigos o añade productos a mano; te avisaremos antes de que caduquen.",
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(vertical = 16.dp)
+        )
+        Button(
+            onClick = onStart,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+        ) {
+            Text("Empezar")
         }
     }
 }
