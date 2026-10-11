@@ -57,6 +57,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -282,62 +283,52 @@ fun SettingsScreen(
 
                         // ================= BOTIQUINES =================
                         "cabinets" -> {
-                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = activeCabinet?.name ?: "Sin botiquín",
-                                        style = MaterialTheme.typography.titleMedium
-                                    )
-                                    Text(
-                                        text = "${cabinets.size} botiquín(es)",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    text = "Elige el botiquín activo",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
 
-                                if (cabinets.size > 1) {
-                                    var expanded by rememberSaveable { mutableStateOf(false) }
-                                    Box {
-                                        OutlinedButton(
-                                            onClick = { expanded = true },
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Icon(Icons.Filled.SwapHoriz, contentDescription = null)
-                                            Text("  Cambiar botiquín")
-                                        }
-                                        DropdownMenu(
-                                            expanded = expanded,
-                                            onDismissRequest = { expanded = false }
-                                        ) {
-                                            cabinets.forEach { cabinet ->
-                                                DropdownMenuItem(
-                                                    text = {
-                                                        Text(
-                                                            text = cabinet.name,
-                                                            color = if (cabinet.id == activeCabinet?.id)
-                                                                MaterialTheme.colorScheme.primary
-                                                            else
-                                                                MaterialTheme.colorScheme.onSurface
-                                                        )
-                                                    },
-                                                    onClick = {
-                                                        expanded = false
-                                                        viewModel.selectCabinet(cabinet.id)
-                                                    }
+                                // Lista de botiquines: toque para cambiar el activo
+                                cabinets.forEach { cabinet ->
+                                    val isActive = cabinet.id == activeCabinet?.id
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { viewModel.selectCabinet(cabinet.id) }
+                                            .padding(vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        RadioButton(
+                                            selected = isActive,
+                                            onClick = { viewModel.selectCabinet(cabinet.id) }
+                                        )
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = cabinet.name,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                color = if (isActive) MaterialTheme.colorScheme.primary
+                                                else MaterialTheme.colorScheme.onSurface
+                                            )
+                                            if (isActive) {
+                                                Text(
+                                                    text = "Activo",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.primary
                                                 )
                                             }
                                         }
                                     }
+                                    HorizontalDivider()
                                 }
 
                                 // Acción principal de la pantalla → relleno
                                 Button(
                                     onClick = { viewModel.onShowCreateCabinet(true) },
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp)
                                 ) {
                                     Icon(Icons.Filled.Add, contentDescription = null)
                                     Text("  Nuevo botiquín")

@@ -6,7 +6,10 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -18,11 +21,14 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -54,7 +60,7 @@ import java.time.ZoneId
  * - Nombre, categoría (chips con FlowRow), cantidad, caducidad MM/AAAA
  * - En edición: botón Eliminar con confirmación
  */
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun AddProductSheet(
     barcode: String,
@@ -110,13 +116,26 @@ fun AddProductSheet(
 
     val parsedExpiryMonth = expiryMonth.toYearMonthSafe(defaultExpiryMonth)
 
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         shape = RectangleShape,
-        title = null,
-        text = {
+        dragHandle = null,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .imePadding()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 16.dp)
+        ) {
+            // ---- Contenido (scrollable: nunca se recorta el último elemento) ----
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 // Header custom: título a la izquierda, icono eliminar a la derecha (solo edición)
@@ -273,9 +292,15 @@ fun AddProductSheet(
                     }
                 }
             }
-        },
-        confirmButton = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+
+            // ---- Acciones (fijas, ancho completo: nunca se solapan) ----
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Acción principal de la pantalla → relleno
                 Button(
                     onClick = {
                         onSave(
@@ -290,7 +315,8 @@ fun AddProductSheet(
                             isNonPerishable
                         )
                     },
-                    enabled = name.isNotBlank()
+                    enabled = name.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(if (existing != null) "Guardar cambios" else "Guardar")
                 }
@@ -314,17 +340,21 @@ fun AddProductSheet(
                             isNonPerishable = false
                             expiryMonth = defaultExpiryMonth.toString()
                         },
-                        enabled = name.isNotBlank()
+                        enabled = name.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Guardar y añadir otro")
                     }
                 }
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Cancelar")
+                }
             }
-        },
-        dismissButton = {
-            OutlinedButton(onClick = onDismiss) { Text("Cancelar") }
         }
-    )
+    }
 
     // Picker mes/año
     if (showMonthPicker) {
