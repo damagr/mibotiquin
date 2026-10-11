@@ -120,7 +120,6 @@ fun AddProductSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         shape = RectangleShape,
-        dragHandle = null,
         containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(
@@ -128,13 +127,13 @@ fun AddProductSheet(
                 .fillMaxWidth()
                 .imePadding()
                 .padding(horizontal = 16.dp)
-                .padding(bottom = 16.dp)
+                .padding(top = 8.dp, bottom = 16.dp)
         ) {
-            // ---- Contenido (scrollable: nunca se recorta el último elemento) ----
+            // ---- Contenido (scrollable, a altura completa: no se ve la app detrás) ----
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f, fill = false)
+                    .weight(1f, fill = true)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
