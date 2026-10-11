@@ -257,8 +257,8 @@ fun AddProductSheet(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedButton(
-                        onClick = { if (quantity > 1) quantity-- },
-                        enabled = quantity > 1
+                        onClick = { if (quantity > 0) quantity-- },
+                        enabled = quantity > 0
                     ) { Text("−") }
                     Text(
                         text = quantity.toString(),
@@ -266,6 +266,16 @@ fun AddProductSheet(
                         modifier = Modifier.padding(horizontal = 8.dp)
                     )
                     OutlinedButton(onClick = { quantity++ }) { Text("+") }
+                }
+                // Marcar como agotado de golpe (vaciar)
+                if (quantity > 0) {
+                    TextButton(onClick = { quantity = 0 }) {
+                        Text(
+                            "Marcar como agotado",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
                 // No perecedero: sin caducidad (vendas, cinta, etc.)

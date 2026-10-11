@@ -99,8 +99,8 @@ fun SetupScreen(
             }
             SetupStep.CHOOSE_NOTIFS -> {
                 ChooseNotificationsStep(
-                    onConfirm = { cooldownDays, hour ->
-                        preferences.notifCooldownDays = cooldownDays
+                    onConfirm = { dayOfMonth, hour ->
+                        preferences.notifDayOfMonth = dayOfMonth
                         preferences.notifHour = hour
                         // La programación se creó con el defecto en onCreate → reprogramar
                         MiBotiquinApplication.rescheduleExpiryChecks(context)
@@ -320,9 +320,9 @@ private fun ChooseFolderStep(
 
 @Composable
 private fun ChooseNotificationsStep(
-    onConfirm: (cooldownDays: Int, hour: Int) -> Unit
+    onConfirm: (dayOfMonth: Int, hour: Int) -> Unit
 ) {
-    var daysText by rememberSaveable { mutableStateOf("7") }
+    var dayText by rememberSaveable { mutableStateOf("1") }
     var hour by rememberSaveable { mutableStateOf(9) }
 
     Column(
@@ -344,22 +344,22 @@ private fun ChooseNotificationsStep(
             textAlign = TextAlign.Center
         )
         Text(
-            text = "¿Cada cuánto quieres que te avisemos de los productos que caducan o están caducados, y a qué hora?",
+            text = "¿Qué día del mes quieres que te avisemos de los productos que caducan o están caducados, y a qué hora?",
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(vertical = 16.dp)
         )
 
-        Text("Recordar cada", style = MaterialTheme.typography.titleSmall)
+        Text("Avisar el día", style = MaterialTheme.typography.titleSmall)
         OutlinedTextField(
-            value = daysText,
+            value = dayText,
             onValueChange = { input ->
-                if (input.length <= 3 && input.all { it.isDigit() }) daysText = input
+                if (input.length <= 2 && input.all { it.isDigit() }) dayText = input
             },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             singleLine = true,
-            label = { Text("días (1–365)") },
+            label = { Text("día del mes (1–28)") },
             modifier = Modifier
                 .width(180.dp)
                 .padding(top = 8.dp)
@@ -385,8 +385,8 @@ private fun ChooseNotificationsStep(
 
         Button(
             onClick = {
-                val days = daysText.toIntOrNull()?.coerceIn(1, 365) ?: 7
-                onConfirm(days, hour)
+                val day = dayText.toIntOrNull()?.coerceIn(1, 28) ?: 1
+                onConfirm(day, hour)
             },
             modifier = Modifier
                 .fillMaxWidth()

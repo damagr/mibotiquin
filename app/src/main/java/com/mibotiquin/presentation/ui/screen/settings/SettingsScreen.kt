@@ -110,8 +110,8 @@ fun SettingsScreen(
     // Estado de actualización (para el feedback "Comprobando…" del botón en Acerca de)
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
 
-    // Avisos de caducidad (cooldown + hora)
-    val notifCooldownDays by viewModel.notifCooldownDays.collectAsStateWithLifecycle()
+    // Avisos de caducidad (día del mes + hora)
+    val notifDayOfMonth by viewModel.notifDayOfMonth.collectAsStateWithLifecycle()
     val notifHour by viewModel.notifHour.collectAsStateWithLifecycle()
     var showCooldownDialog by rememberSaveable { mutableStateOf(false) }
     var showHourDialog by rememberSaveable { mutableStateOf(false) }
@@ -240,7 +240,7 @@ fun SettingsScreen(
                                 SettingsMenuRow(
                                     icon = Icons.Filled.Notifications,
                                     title = "Avisos de caducidad",
-                                    subtitle = "$notifCooldownDays días · %02d:00".format(notifHour),
+                                    subtitle = "día $notifDayOfMonth de cada mes · %02d:00".format(notifHour),
                                     onClick = { section = "notifications" }
                                 )
                                 // Cámara: ajuste único → switch inline
@@ -465,7 +465,7 @@ fun SettingsScreen(
                         "notifications" -> {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(
-                                    text = "Te avisamos de los productos que caducan o están caducados. Al empeorar avisa siempre; si sigue igual, recuerda según el intervalo elegido.",
+                                    text = "Te avisamos de los productos que caducan o están caducados. Al empeorar avisa siempre; si sigue igual, avisa el día del mes elegido.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -474,9 +474,9 @@ fun SettingsScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("Recordar cada", style = MaterialTheme.typography.bodyLarge)
+                                    Text("Día del aviso", style = MaterialTheme.typography.bodyLarge)
                                     OutlinedButton(onClick = { showCooldownDialog = true }) {
-                                        Text(if (notifCooldownDays == 1) "1 día" else "$notifCooldownDays días")
+                                        Text("Día $notifDayOfMonth de cada mes")
                                     }
                                 }
                                 Row(
@@ -535,20 +535,20 @@ fun SettingsScreen(
 
     // ---- Diálogos de avisos de caducidad ----
 
-    // Intervalo de recordatorio (1..365 días)
+    // Día del mes del aviso (1..28)
     if (showCooldownDialog) {
-        var daysText by remember { mutableStateOf(notifCooldownDays.toString()) }
+        var dayText by remember { mutableStateOf(notifDayOfMonth.toString()) }
         AlertDialog(
             onDismissRequest = { showCooldownDialog = false },
             shape = RoundedCornerShape(0.dp),
-            title = { Text("Recordar cada") },
+            title = { Text("Día del aviso") },
             text = {
                 OutlinedTextField(
-                    value = daysText,
+                    value = dayText,
                     onValueChange = { input ->
-                        if (input.length <= 3 && input.all { it.isDigit() }) daysText = input
+                        if (input.length <= 2 && input.all { it.isDigit() }) dayText = input
                     },
-                    label = { Text("días (1–365)") },
+                    label = { Text("día del mes (1–28)") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
@@ -556,8 +556,8 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val days = daysText.toIntOrNull()?.coerceIn(1, 365) ?: notifCooldownDays
-                    viewModel.setNotifCooldownDays(days)
+                    val day = dayText.toIntOrNull()?.coerceIn(1, 28) ?: notifDayOfMonth
+                    viewModel.setNotifDayOfMonth(day)
                     showCooldownDialog = false
                 }) { Text("Guardar") }
             },
@@ -626,7 +626,7 @@ fun SettingsScreen(
                     )
                     Text("🔔 Avisos de caducidad", style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "Te avisamos antes de que caduquen. Avisa siempre que un producto empeora; si sigue igual, recuerda cada X días a la hora que elijas. «Mantener» silencia hasta que empeore.",
+                        "Te avisamos antes de que caduquen, el día del mes y a la hora que elijas. Avisa siempre que un producto empeore; «Mantener» silencia hasta que empeore. Si no llegan avisos, excluye la app de la optimización de batería.",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text("📤 Compartir y transferir", style = MaterialTheme.typography.titleSmall)

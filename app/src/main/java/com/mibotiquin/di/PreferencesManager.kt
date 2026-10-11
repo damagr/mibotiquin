@@ -50,11 +50,11 @@ class PreferencesManager(context: Context) {
 
     // ---- Avisos de caducidad ----
 
-    /** Recordatorio: cada cuántos días avisar (1..365) */
-    var notifCooldownDays: Int
-        get() = prefs.getInt(KEY_NOTIF_COOLDOWN_DAYS, 7).coerceIn(1, 365)
+    /** Día del mes de los avisos (1..28) — ancla de calendario en lugar de cooldown deslizante */
+    var notifDayOfMonth: Int
+        get() = prefs.getInt(KEY_NOTIF_DAY_OF_MONTH, 1).coerceIn(1, 28)
         set(value) {
-            prefs.edit().putInt(KEY_NOTIF_COOLDOWN_DAYS, value.coerceIn(1, 365)).apply()
+            prefs.edit().putInt(KEY_NOTIF_DAY_OF_MONTH, value.coerceIn(1, 28)).apply()
         }
 
     /** Hora del día de los avisos (0..23), sin minutos */
@@ -111,6 +111,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_BACKUP_FOLDER_NAME = "backup_folder_display_name"
         private const val KEY_USE_CAMERA = "use_camera"
         private const val KEY_NOTIF_COOLDOWN_DAYS = "notif_cooldown_days"
+        private const val KEY_NOTIF_DAY_OF_MONTH = "notif_day_of_month"
         private const val KEY_NOTIF_HOUR = "notif_hour"
         private const val KEY_NOTIF_STATE_PREFIX = "notif_state_"
     }

@@ -107,8 +107,8 @@ object ExpiryNotificationHelper {
         }
     }
 
-    /** Notificación resumen (varios productos afectados) → abre la pantalla de gestión */
-    fun notifySummary(context: Context, count: Int) {
+    /** Notificación resumen (varios productos afectados) con sus nombres → pantalla de gestión */
+    fun notifySummary(context: Context, products: List<ProductUiModel>) {
         val openIntent = PendingIntent.getActivity(
             context,
             SUMMARY_NOTIFICATION_ID,
@@ -119,10 +119,19 @@ object ExpiryNotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Los 3 primeros nombres en el cuerpo; el resto como "y N más"
+        val shown = products.take(3).map { it.product.name }
+        val extra = products.size - shown.size
+
+        val inbox = NotificationCompat.InboxStyle()
+        shown.forEach { inbox.addLine(it) }
+        if (extra > 0) inbox.addLine("y $extra más")
+
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setContentTitle("$count productos requieren atención")
-            .setContentText("Toca para revisar los productos por caducar")
+            .setContentTitle("${products.size} productos requieren atención")
+            .setContentText(shown.joinToString(" · ") + if (extra > 0) "…" else "")
+            .setStyle(inbox)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(openIntent)
             .setAutoCancel(true)

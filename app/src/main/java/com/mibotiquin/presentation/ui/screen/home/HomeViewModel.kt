@@ -19,6 +19,7 @@ import com.mibotiquin.domain.model.Product
 import com.mibotiquin.domain.model.ProductUiModel
 import com.mibotiquin.domain.repository.ProductRepository
 import com.mibotiquin.domain.usecase.*
+import com.mibotiquin.notifications.ExpiryCheckWorker
 import com.mibotiquin.notifications.ExpiryNotificationHelper
 import com.mibotiquin.ui.UpdateState
 import kotlinx.coroutines.Dispatchers
@@ -408,7 +409,16 @@ class HomeViewModel(
 
     fun importCabinet(uri: Uri) {
         viewModelScope.launch {
-            when (val result = transferManager.importAny(uri)) {
+            val result = transferManager.importAny(uri)
+            // Chequeo inmediato: los productos importados pueden requerir atención al momento
+            when (result) {
+                is CabinetTransferManager.ImportResult.Success,
+                is CabinetTransferManager.ImportResult.MultiSuccess,
+                is CabinetTransferManager.ImportResult.ProductAdded ->
+                    ExpiryCheckWorker.runCheck(context)
+                else -> Unit
+            }
+            when (result) {
                 is CabinetTransferManager.ImportResult.Success -> {
                     selectCabinet(result.cabinetId)
                     _transferEvent.value = "Botiquín '${result.name}' importado (${result.productCount} productos)"
@@ -480,13 +490,13 @@ class HomeViewModel(
 
     // ---- Avisos de caducidad ----
 
-    /** Recordatorio en días (1..365) */
-    private val _notifCooldownDays = MutableStateFlow(preferences.notifCooldownDays)
-    val notifCooldownDays: StateFlow<Int> = _notifCooldownDays.asStateFlow()
+    /** Día del mes del aviso (1..28) */
+    private val _notifDayOfMonth = MutableStateFlow(preferences.notifDayOfMonth)
+    val notifDayOfMonth: StateFlow<Int> = _notifDayOfMonth.asStateFlow()
 
-    fun setNotifCooldownDays(days: Int) {
-        preferences.notifCooldownDays = days
-        _notifCooldownDays.value = preferences.notifCooldownDays
+    fun setNotifDayOfMonth(day: Int) {
+        preferences.notifDayOfMonth = day
+        _notifDayOfMonth.value = preferences.notifDayOfMonth
     }
 
     /** Hora del día de los avisos (0..23, sin minutos) */

@@ -6,13 +6,17 @@ import androidx.work.WorkerParameters
 import com.mibotiquin.MiBotiquinApplication
 import com.mibotiquin.domain.model.ExpiryStatus
 import kotlinx.coroutines.flow.first
+import java.time.YearMonth
+import java.time.ZoneId
+import java.util.Calendar
 
 /**
- * Comprueba productos SOON/CRITICAL/EXPIRED y avisa con cooldown configurable.
- * - Avisa siempre al EMPEORAR de estado (OK→SOON→CRITICAL→EXPIRED)
- * - Si sigue igual: recuerda cada `notifCooldownDays` (salvo si está silenciado)
+ * Comprueba productos SOON/CRITICAL/EXPIRED y avisa con cadencia mensual.
+ * - Avisa SIEMPRE al EMPEORAR de estado (OK→SOON→CRITICAL→EXPIRED)
+ * - Ancla de calendario: avisa el DÍA DEL MES configurado (a la hora elegida),
+ *   si el último aviso fue en un mes anterior
  * - "Mantener" silencia hasta el próximo empeoramiento
- * - 1 producto afectado → notificación individual · ≥2 → resumen → pantalla de gestión
+ * - 1 producto → notificación individual · ≥2 → resumen → pantalla de gestión
  */
 class ExpiryCheckWorker(
     appContext: Context,
@@ -21,7 +25,22 @@ class ExpiryCheckWorker(
 
     override suspend fun doWork(): Result {
         return try {
-            val container = MiBotiquinApplication.container(applicationContext)
+            runCheck(applicationContext)
+            Result.success()
+        } catch (e: Exception) {
+            Result.retry()
+        }
+    }
+
+    companion object {
+        const val WORK_NAME = "expiry_check_work"
+
+        /**
+         * Comprobación de caducidad — la usa el worker diario Y el chequeo inmediato
+         * tras importar (los productos importados pueden requerir atención al momento).
+         */
+        suspend fun runCheck(context: Context) {
+            val container = MiBotiquinApplication.container(context)
             val repository = container.productRepository
             val prefs = container.preferences
 
@@ -32,8 +51,10 @@ class ExpiryCheckWorker(
                     it.expiryStatus == ExpiryStatus.EXPIRED
                 }
 
+            val today = Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
+            val dayOfMonth = prefs.notifDayOfMonth
+            val nowMonth = YearMonth.now()
             val now = System.currentTimeMillis()
-            val cooldownMs = prefs.notifCooldownDays.toLong() * 24L * 60L * 60L * 1000L
 
             val toNotify = products.filter { product ->
                 val prev = prefs.notifState(product.product.id)
@@ -41,13 +62,20 @@ class ExpiryCheckWorker(
                     prev == null -> true                                       // primera vez
                     prev.status != product.expiryStatus.name -> true           // empeoró (o cambió)
                     prev.silenced -> false                                     // silenciado sin cambio → no
-                    else -> (now - prev.timestamp) > cooldownMs                // toca recordatorio
+                    else -> {
+                        // Ancla mensual: hoy ≥ día configurado y el último aviso fue en un mes anterior
+                        val lastYM = YearMonth.from(
+                            java.time.Instant.ofEpochMilli(prev.timestamp)
+                                .atZone(ZoneId.systemDefault())
+                        )
+                        nowMonth.isAfter(lastYM) && today >= dayOfMonth
+                    }
                 }
             }
 
             when {
-                toNotify.size == 1 -> ExpiryNotificationHelper.notifyExpiry(applicationContext, toNotify[0])
-                toNotify.size > 1 -> ExpiryNotificationHelper.notifySummary(applicationContext, toNotify.size)
+                toNotify.size == 1 -> ExpiryNotificationHelper.notifyExpiry(context, toNotify[0])
+                toNotify.size > 1 -> ExpiryNotificationHelper.notifySummary(context, toNotify)
             }
 
             toNotify.forEach { product ->
@@ -61,14 +89,6 @@ class ExpiryCheckWorker(
                     silenced = sameStatus && (prev?.silenced ?: false)
                 )
             }
-
-            Result.success()
-        } catch (e: Exception) {
-            Result.retry()
         }
-    }
-
-    companion object {
-        const val WORK_NAME = "expiry_check_work"
     }
 }

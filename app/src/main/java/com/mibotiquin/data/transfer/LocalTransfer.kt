@@ -77,6 +77,12 @@ class LocalTransfer(
                         runCatching {
                             client.getOutputStream().write(ackFor(result).toByteArray(Charsets.UTF_8))
                         }
+                        // Chequeo inmediato: los productos recibidos pueden requerir atención
+                        if (result is com.mibotiquin.data.transfer.LocalTransfer.TransferResult.Received) {
+                            runCatching {
+                                com.mibotiquin.notifications.ExpiryCheckWorker.runCheck(context)
+                            }
+                        }
                         withContext(Dispatchers.Main) { onResult(result) }
                     } catch (_: Exception) {
                         // conexión fallida concreta: seguir escuchando

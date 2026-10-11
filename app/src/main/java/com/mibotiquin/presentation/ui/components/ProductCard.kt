@@ -183,7 +183,10 @@ private fun ExpiryChip(
                 text = when (status) {
                     ExpiryStatus.SOON, ExpiryStatus.CRITICAL -> monthsText
                     ExpiryStatus.EXPIRED -> "Caducado ${monthsText.replace("desde ", "")}"
-                    ExpiryStatus.EMPTY -> stringResource(R.string.product_empty)
+                    // Agotado: también mostramos su caducidad para decidir si merece recompra
+                    ExpiryStatus.EMPTY ->
+                        if (isNonPerishable) stringResource(R.string.product_empty)
+                        else "${stringResource(R.string.product_empty)} · caduca $expiryMonth"
                     else -> ""
                 },
                 style = MaterialTheme.typography.labelMedium,
