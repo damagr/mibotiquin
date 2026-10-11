@@ -31,8 +31,8 @@ import androidx.compose.material.icons.filled.Healing
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -74,6 +74,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 fun HomeScreen(
     onOpenScanner: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenExpiring: () -> Unit = {},
     scannedCn: String? = null,
     scannedName: String? = null,
     scannedExpiry: String? = null,
@@ -85,7 +86,6 @@ fun HomeScreen(
     val products by viewModel.products.collectAsStateWithLifecycle()
     val cabinets by viewModel.cabinets.collectAsStateWithLifecycle()
     val activeCabinet by viewModel.activeCabinet.collectAsStateWithLifecycle()
-    val useCamera by viewModel.useCamera.collectAsStateWithLifecycle()
     val showProductSheet by viewModel.showProductSheet.collectAsStateWithLifecycle()
     val editingProduct by viewModel.editingProduct.collectAsStateWithLifecycle()
 
@@ -145,7 +145,7 @@ fun HomeScreen(
                 }
             }
 
-            // Search bar + botón de escaneo (fuera del searchbar: buscar ≠ introducir)
+            // Search bar + acceso a la gestión de caducidad + añadir producto
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -158,6 +158,13 @@ fun HomeScreen(
                     focusRequester = focusRequester,
                     modifier = Modifier.weight(1f)
                 )
+                IconButton(onClick = onOpenExpiring, modifier = Modifier.size(48.dp)) {
+                    Icon(
+                        imageVector = Icons.Filled.WarningAmber,
+                        contentDescription = "Productos por caducar",
+                        tint = MaterialTheme.colorScheme.tertiary
+                    )
+                }
                 IconButton(onClick = onOpenScanner, modifier = Modifier.size(48.dp)) {
                     Icon(
                         imageVector = Icons.Filled.Add,

@@ -43,7 +43,6 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -393,7 +392,7 @@ fun SettingsScreen(
                                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
                                 Text(
-                                    text = "Ficheros: guarda el botiquín activo o cárgalo desde un fichero (friends, WhatsApp, Drive…).",
+                                    text = "Ficheros: guarda el botiquín activo o cárgalo desde un fichero (gestor de archivos, WhatsApp, Drive…).",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

@@ -63,6 +63,11 @@ fun SetupScreen(
     var folderPickCancelled by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
 
+    // Al llegar al paso final el setup está completo: pulsar "atrás" no lo re-ejecuta
+    LaunchedEffect(step) {
+        if (step == SetupStep.DONE) preferences.isFirstRun = false
+    }
+
     val treeLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->

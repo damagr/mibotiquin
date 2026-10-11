@@ -396,15 +396,8 @@ class CabinetTransferManager(
 
         // Familias: recrear las que falten en el destino ANTES de crear los productos
         // (los productos importados conservan su familia originaria; si no existe, se crea)
-        val categoryMap = mutableMapOf<String, Category>()
-        payload.products.map { it.category }.distinct().forEach { familyName ->
-            categoryMap[familyName] = when (familyName) {
-                "Medicamentos" -> Category.Medicamentos
-                else -> repository.getAllCategories().first()
-                    .firstOrNull { it.displayName == familyName }
-                    ?: repository.addCustomCategory(familyName)
-            }
-        }
+        val categoryMap = payload.products.map { it.category }.distinct()
+            .associateWith { resolveCategory(it) }
 
         payload.products.forEach { tp ->
             repository.addProduct(

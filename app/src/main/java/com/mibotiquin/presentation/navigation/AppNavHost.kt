@@ -90,6 +90,9 @@ fun AppNavHost(viewModelFactory: ViewModelProvider.Factory) {
             HomeScreen(
                 onOpenScanner = { navController.navigate(AppDestinations.SCANNER) },
                 onOpenSettings = { navController.navigate(AppDestinations.SETTINGS) },
+                onOpenExpiring = {
+                    navController.navigate(AppDestinations.EXPIRING) { launchSingleTop = true }
+                },
                 scannedCn = scannedCn,
                 scannedName = scannedName,
                 scannedExpiry = scannedExpiry,

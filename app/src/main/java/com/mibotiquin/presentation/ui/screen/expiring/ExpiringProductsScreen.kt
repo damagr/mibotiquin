@@ -24,8 +24,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -46,12 +48,16 @@ fun ExpiringProductsScreen(
     viewModel: HomeViewModel
 ) {
     val products by viewModel.expiringProducts.collectAsStateWithLifecycle()
-    val selectedIds = remember { mutableStateListOf<Long>() }
+    // Selección persistente (sobrevive rotación): Set<Long> serializable
+    var selectedIds by rememberSaveable { mutableStateOf(emptySet<Long>()) }
+    val toggleSelection: (Long) -> Unit = { id ->
+        selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
+    }
 
     // Limpiar selección de productos que ya no están en la lista
     LaunchedEffect(products) {
         val ids = products.map { it.product.id }
-        selectedIds.retainAll { it in ids }
+        selectedIds = selectedIds.filter { it in ids }.toSet()
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -105,13 +111,7 @@ fun ExpiringProductsScreen(
                     ExpiringRow(
                         product = product,
                         checked = product.product.id in selectedIds,
-                        onToggle = {
-                            if (product.product.id in selectedIds) {
-                                selectedIds.remove(product.product.id)
-                            } else {
-                                selectedIds.add(product.product.id)
-                            }
-                        }
+                        onToggle = { toggleSelection(product.product.id) }
                     )
                 }
             }
@@ -129,7 +129,7 @@ fun ExpiringProductsScreen(
                 OutlinedButton(
                     onClick = {
                         viewModel.silenceProducts(selectedProducts)
-                        selectedIds.clear()
+                        selectedIds = emptySet()
                     },
                     enabled = selectedProducts.isNotEmpty(),
                     modifier = Modifier.weight(1f)
@@ -139,7 +139,7 @@ fun ExpiringProductsScreen(
                 Button(
                     onClick = {
                         viewModel.deleteProducts(selectedProducts)
-                        selectedIds.clear()
+                        selectedIds = emptySet()
                     },
                     enabled = selectedProducts.isNotEmpty(),
                     colors = ButtonDefaults.buttonColors(
