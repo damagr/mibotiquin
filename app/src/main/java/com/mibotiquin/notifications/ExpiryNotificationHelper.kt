@@ -33,15 +33,17 @@ object ExpiryNotificationHelper {
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
-    /** Notificación individual (un solo producto afectado) */
-    fun notifyExpiry(context: Context, product: ProductUiModel) {
+    /** Notificación individual (un solo producto afectado) — indica el botiquín de origen */
+    fun notifyExpiry(context: Context, product: ProductUiModel, cabinetName: String) {
         val status = product.expiryStatus
         if (status == ExpiryStatus.OK || status == ExpiryStatus.EMPTY) return
 
+        val cabinetSuffix = if (cabinetName.isNotBlank()) " — $cabinetName" else ""
+
         val title = when (status) {
-            ExpiryStatus.SOON -> "${product.product.name} caduca pronto"
-            ExpiryStatus.CRITICAL -> "¡${product.product.name} caduca ${product.formattedMonthsUntilExpiry}!"
-            ExpiryStatus.EXPIRED -> "${product.product.name} ha caducado"
+            ExpiryStatus.SOON -> "${product.product.name} caduca pronto$cabinetSuffix"
+            ExpiryStatus.CRITICAL -> "¡${product.product.name} caduca ${product.formattedMonthsUntilExpiry}!$cabinetSuffix"
+            ExpiryStatus.EXPIRED -> "${product.product.name} ha caducado$cabinetSuffix"
             else -> return
         }
 
@@ -107,8 +109,8 @@ object ExpiryNotificationHelper {
         }
     }
 
-    /** Notificación resumen (varios productos afectados) con sus nombres → pantalla de gestión */
-    fun notifySummary(context: Context, products: List<ProductUiModel>) {
+    /** Notificación resumen (varios productos afectados) con nombres y botiquín → pantalla de gestión */
+    fun notifySummary(context: Context, products: List<ProductUiModel>, cabinetNames: Map<String, String>) {
         val openIntent = PendingIntent.getActivity(
             context,
             SUMMARY_NOTIFICATION_ID,
@@ -119,18 +121,22 @@ object ExpiryNotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Los 3 primeros nombres en el cuerpo; el resto como "y N más"
-        val shown = products.take(3).map { it.product.name }
+        // Los 3 primeros en el cuerpo con su botiquín; el resto como "y N más"
+        val shown = products.take(3)
         val extra = products.size - shown.size
 
         val inbox = NotificationCompat.InboxStyle()
-        shown.forEach { inbox.addLine(it) }
+        shown.forEach { product ->
+            val cabinet = cabinetNames[product.product.cabinetId]
+            val line = if (cabinet != null) "${product.product.name} — $cabinet" else product.product.name
+            inbox.addLine(line)
+        }
         if (extra > 0) inbox.addLine("y $extra más")
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setContentTitle("${products.size} productos requieren atención")
-            .setContentText(shown.joinToString(" · ") + if (extra > 0) "…" else "")
+            .setContentText(shown.joinToString(" · ") { it.product.name } + if (extra > 0) "…" else "")
             .setStyle(inbox)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(openIntent)

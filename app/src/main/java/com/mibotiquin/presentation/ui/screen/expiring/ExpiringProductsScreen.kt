@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -25,7 +27,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -38,7 +39,8 @@ import com.mibotiquin.domain.model.ProductUiModel
 import com.mibotiquin.presentation.ui.screen.home.HomeViewModel
 
 /**
- * Pantalla de gestión de productos por caducar / caducados (SOON/CRITICAL/EXPIRED).
+ * Pantalla de gestión de productos por caducar / caducados (SOON/CRITICAL/EXPIRED)
+ * de TODOS los botiquines, agrupados por botiquín (encabezado + productos debajo).
  * Lista scrolleable con checkboxes + acciones en lote (Mantener = silenciar · Eliminar).
  * Se abre al tocar la notificación resumen de caducidad.
  */
@@ -48,6 +50,7 @@ fun ExpiringProductsScreen(
     viewModel: HomeViewModel
 ) {
     val products by viewModel.expiringProducts.collectAsStateWithLifecycle()
+    val cabinets by viewModel.cabinets.collectAsStateWithLifecycle()
     // Selección persistente (sobrevive rotación): Set<Long> serializable
     var selectedIds by rememberSaveable { mutableStateOf(emptySet<Long>()) }
     val toggleSelection: (Long) -> Unit = { id ->
@@ -99,6 +102,10 @@ fun ExpiringProductsScreen(
                 )
             }
         } else {
+            // Agrupar por botiquín (ID → nombre desde la lista de botiquines)
+            val cabinetNames = cabinets.associate { it.id to it.name }
+            val grouped = products.groupBy { it.product.cabinetId }
+
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -107,18 +114,51 @@ fun ExpiringProductsScreen(
                     horizontal = 12.dp, vertical = 8.dp
                 )
             ) {
-                items(products, key = { it.product.id }) { product ->
-                    ExpiringRow(
-                        product = product,
-                        checked = product.product.id in selectedIds,
-                        onToggle = { toggleSelection(product.product.id) }
-                    )
+                grouped.forEach { (cabinetId, groupProducts) ->
+                    val cabinetName = cabinetNames[cabinetId] ?: "Sin botiquín"
+
+                    // Encabezado: nombre del botiquín + contador (como las familias en Home)
+                    item(key = "header_$cabinetId") {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 16.dp, bottom = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = cabinetName,
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = groupProducts.size.toString(),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier
+                                    .background(
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                        RoundedCornerShape(100.dp)
+                                    )
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    // Productos del grupo
+                    items(groupProducts, key = { it.product.id }) { product ->
+                        ExpiringRow(
+                            product = product,
+                            checked = product.product.id in selectedIds,
+                            onToggle = { toggleSelection(product.product.id) }
+                        )
+                    }
                 }
             }
 
             HorizontalDivider()
 
-            // Acciones en lote
+            // Acciones en lote (selección global entre grupos)
             val selectedProducts = products.filter { it.product.id in selectedIds }
             Row(
                 modifier = Modifier

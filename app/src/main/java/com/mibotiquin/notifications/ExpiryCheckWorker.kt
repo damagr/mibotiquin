@@ -51,6 +51,10 @@ class ExpiryCheckWorker(
                     it.expiryStatus == ExpiryStatus.EXPIRED
                 }
 
+            // Mapa cabinetId → nombre del botiquín (para indicarlo en los avisos)
+            val cabinetNames = repository.getAllCabinets().first()
+                .associate { it.id to it.name }
+
             val today = Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
             val dayOfMonth = prefs.notifDayOfMonth
             val nowMonth = YearMonth.now()
@@ -74,8 +78,13 @@ class ExpiryCheckWorker(
             }
 
             when {
-                toNotify.size == 1 -> ExpiryNotificationHelper.notifyExpiry(context, toNotify[0])
-                toNotify.size > 1 -> ExpiryNotificationHelper.notifySummary(context, toNotify)
+                toNotify.size == 1 ->
+                    ExpiryNotificationHelper.notifyExpiry(
+                        context, toNotify[0],
+                        cabinetNames[toNotify[0].product.cabinetId] ?: ""
+                    )
+                toNotify.size > 1 ->
+                    ExpiryNotificationHelper.notifySummary(context, toNotify, cabinetNames)
             }
 
             toNotify.forEach { product ->
