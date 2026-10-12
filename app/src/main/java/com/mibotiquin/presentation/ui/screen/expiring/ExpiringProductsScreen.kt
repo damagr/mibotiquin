@@ -63,12 +63,15 @@ fun ExpiringProductsScreen(
         selectedIds = selectedIds.filter { it in ids }.toSet()
     }
 
+    // Status bar height fijo (24dp), mismo patrón que el resto de pantallas
+    val statusBarPadding = 24.dp
+
     Column(modifier = Modifier.fillMaxSize()) {
         // Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
+                .padding(top = statusBarPadding, start = 8.dp, end = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
